@@ -1,19 +1,18 @@
+mod utils;
+
 use clap::{Parser, CommandFactory};
-use indicatif::{ProgressBar, ProgressStyle};
-use rayon::prelude::*;
-use serde::Deserialize;
-use std::collections::HashMap;
-use std::fs;
+use std::fs::File;
 use std::io;
-use std::path::{Path, PathBuf};
-use walkdir::WalkDir;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use utils::{copy_incremental, load_translations, log_output, Logger};
 
 #[derive(Parser)]
 #[command(
     author = "Alessandro Maestri",
     version,
     about = "Incremental directory backup for Windows",
-    long_about = "winrsync: a Rust-based backup tool that copies only new or modified files from a source to a destination directory. Supports multithreading, language localization, and progress display.",
+    long_about = "winrsync: a Rust-based backup tool that copies only new or modified files from a source to a destination directory. Supports multithreading, language localization, logging, and progress display.",
     arg_required_else_help = true
 )]
 struct Args {
@@ -30,106 +29,19 @@ struct Args {
     /// Show graphical progress bar instead of filenames
     #[arg(short = 'g', long = "graph")]
     show_graph: bool,
-}
 
-#[derive(Deserialize)]
-struct Messages {
-    starting_backup: String,
-    to: String,
-    copying_file: String,
-    backup_done: String,
-    invalid_source: String,
-    language_not_supported: String,
-}
+    /// Quiet mode: suppress console output
+    #[arg(short = 'q', long = "quiet")]
+    quiet: bool,
 
-type Translations = HashMap<String, Messages>;
-
-fn load_translations() -> io::Result<Translations> {
-    let data = include_str!("../assets/translations.json");
-    let translations: Translations = serde_json::from_str(data)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-    Ok(translations)
-}
-
-fn is_newer(src: &Path, dest: &Path) -> io::Result<bool> {
-    if !dest.exists() {
-        return Ok(true);
-    }
-
-    let src_meta = src.metadata()?;
-    let dest_meta = dest.metadata()?;
-
-    Ok(src_meta.modified()? > dest_meta.modified()?)
-}
-
-fn copy_incremental(
-    src_dir: &Path,
-    dest_dir: &Path,
-    msg: &Messages,
-    show_graph: bool,
-) -> io::Result<()> {
-    let entries: Vec<_> = WalkDir::new(src_dir)
-        .into_iter()
-        .filter_map(Result::ok)
-        .filter(|e| {
-            e.path().is_file()
-                && !e.path().extension().map_or(false, |ext| {
-                    matches!(ext.to_str(), Some("gsheet" | "gdoc" | "gslides"))
-                })
-        })
-        .collect();
-
-    let pb = if show_graph {
-        let bar = ProgressBar::new(entries.len() as u64);
-        bar.set_style(
-            ProgressStyle::with_template(
-                "[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len}",
-            )
-            .unwrap()
-            .progress_chars("=> "),
-        );
-        Some(bar)
-    } else {
-        None
-    };
-
-    entries.par_iter().try_for_each(|entry| -> io::Result<()> {
-        let src_path = entry.path();
-        let rel_path = src_path.strip_prefix(src_dir).unwrap();
-        let dest_path = dest_dir.join(rel_path);
-
-        if is_newer(src_path, &dest_path)? {
-            if let Some(parent) = dest_path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-
-            fs::copy(src_path, dest_path)?;
-
-            if let Some(ref pb) = pb {
-                pb.inc(1);
-            } else {
-                println!("{} {}", msg.copying_file, rel_path.display());
-            }
-        } else if let Some(ref pb) = pb {
-            pb.inc(1);
-        }
-
-        Ok(())
-    })?;
-
-    if let Some(pb) = pb {
-        pb.finish_with_message(msg.backup_done.clone());
-    } else {
-        println!("{}", msg.backup_done);
-    }
-
-    Ok(())
+    /// Write output to a log file
+    #[arg(long = "log", value_name = "FILE")]
+    log_file: Option<PathBuf>,
 }
 
 fn main() -> io::Result<()> {
     let args = Args::parse();
 
-    // Mostra help se mancano sorgente o destinazione
     if args.source.is_none() || args.destination.is_none() {
         eprintln!("Error: missing source or destination directory.\n");
         Args::command().print_help().unwrap();
@@ -137,8 +49,19 @@ fn main() -> io::Result<()> {
         std::process::exit(1);
     }
 
-    let translations = load_translations()?;
+    let logger: Logger = if let Some(ref path) = args.log_file {
+        match File::create(path) {
+            Ok(file) => Some(Arc::new(Mutex::new(file))),
+            Err(e) => {
+                eprintln!("Failed to create log file: {}", e);
+                std::process::exit(1);
+            }
+        }
+    } else {
+        None
+    };
 
+    let translations = load_translations()?;
     let lang_code = if args.lang == "auto" {
         sys_locale::get_locale()
             .and_then(|val| val.split(&['_', '-']).next().map(str::to_lowercase))
@@ -170,18 +93,29 @@ fn main() -> io::Result<()> {
     }
 
     if !destination.exists() {
-        fs::create_dir_all(&destination)?;
+        std::fs::create_dir_all(destination)?;
     }
 
-    println!(
-        "{}\n  {}\n{}\n  {}",
-        msg.starting_backup,
-        source.display(),
-        msg.to,
-        destination.display()
+    log_output(
+        &format!(
+            "{}\n  {}\n{}\n  {}",
+            msg.starting_backup,
+            source.display(),
+            msg.to,
+            destination.display()
+        ),
+        &logger,
+        args.quiet,
     );
 
-    copy_incremental(source, destination, msg, args.show_graph)?;
+    copy_incremental(
+        source,
+        destination,
+        msg,
+        args.show_graph,
+        &logger,
+        args.quiet,
+    )?;
 
     Ok(())
 }
