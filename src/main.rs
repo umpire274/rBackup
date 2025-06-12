@@ -6,6 +6,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 #[warn(unused_imports)]
+use indicatif::{ProgressBar, ProgressStyle};
 use rayon::prelude::*;
 
 #[derive(Parser)]
@@ -20,8 +21,14 @@ struct Args {
     /// Language code: en or it (default: en)
     #[arg(short, long, default_value = "auto")]
     lang: String,
+
+    /// Show graphical progress bar instead of filenames
+    #[arg(short = 'g', long = "graph")]
+    show_graph: bool,
 }
 
+
+#[allow(dead_code)]
 #[derive(Deserialize)]
 struct Messages {
     starting_backup: String,
@@ -52,7 +59,7 @@ fn is_newer(src: &Path, dest: &Path) -> io::Result<bool> {
     Ok(src_meta.modified()? > dest_meta.modified()?)
 }
 
-fn copy_incremental(src_dir: &Path, dest_dir: &Path, msg: &Messages) -> io::Result<()> {
+fn copy_incremental(src_dir: &Path, dest_dir: &Path, msg: &Messages, show_graph: bool) -> io::Result<()> {
     let entries: Vec<_> = WalkDir::new(src_dir)
         .into_iter()
         .filter_map(Result::ok)
@@ -64,6 +71,14 @@ fn copy_incremental(src_dir: &Path, dest_dir: &Path, msg: &Messages) -> io::Resu
         })
         .collect();
 
+    let pb = if show_graph {
+        let bar = ProgressBar::new(entries.len() as u64);
+        bar.set_style(ProgressStyle::with_template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len}").unwrap().progress_chars("=> "));
+        Some(bar)
+    } else {
+        None
+    };
+
     entries.par_iter().try_for_each(|entry| -> io::Result<()> {
         let src_path = entry.path();
         let rel_path = src_path.strip_prefix(src_dir).unwrap();
@@ -73,12 +88,26 @@ fn copy_incremental(src_dir: &Path, dest_dir: &Path, msg: &Messages) -> io::Resu
             if let Some(parent) = dest_path.parent() {
                 fs::create_dir_all(parent)?;
             }
-            println!("{} {}", msg.copying_file, rel_path.display());
+
             fs::copy(src_path, dest_path)?;
+
+            if let Some(ref pb) = pb {
+                pb.inc(1);
+            } else {
+                println!("{} {}", msg.copying_file, rel_path.display());
+            }
+        } else if let Some(ref pb) = pb {
+            pb.inc(1);
         }
 
         Ok(())
-    })
+    })?;
+
+    if let Some(pb) = pb {
+        pb.finish_with_message(msg.backup_done.clone());
+    }
+
+    Ok(())
 }
 
 fn main() -> io::Result<()> {
@@ -125,7 +154,7 @@ fn main() -> io::Result<()> {
         args.destination.display()
     );
 
-    copy_incremental(&args.source, &args.destination, msg)?;
+    copy_incremental(&args.source, &args.destination, msg, args.show_graph)?;
 
     println!("{}", msg.backup_done);
     Ok(())
