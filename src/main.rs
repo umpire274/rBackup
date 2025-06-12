@@ -115,7 +115,7 @@ fn main() -> io::Result<()> {
         args.timestamp,
     );
 
-    copy_incremental(
+    let (copied, skipped) = copy_incremental(
         source,
         destination,
         msg,
@@ -126,6 +126,18 @@ fn main() -> io::Result<()> {
     )?;
 
     log_output("== Backup completed ==", &logger, args.quiet, args.timestamp);
+    log_output(
+        &msg.files_copied.replace("{}", &copied.to_string()),
+        &logger,
+        args.quiet,
+        args.timestamp,
+    );
+    log_output(
+        &msg.files_skipped.replace("{}", &skipped.to_string()),
+        &logger,
+        args.quiet,
+        args.timestamp,
+    );
 
     Ok(())
 }

@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, atomic::{AtomicUsize, Ordering}};
 use walkdir::WalkDir;
 
 #[derive(Deserialize)]
@@ -17,6 +17,8 @@ pub struct Messages {
     pub backup_done: String,
     pub invalid_source: String,
     pub language_not_supported: String,
+    pub files_copied: String,
+    pub files_skipped: String,
 }
 
 pub type Translations = HashMap<String, Messages>;
@@ -67,7 +69,7 @@ pub fn copy_incremental(
     logger: &Logger,
     quiet: bool,
     with_timestamp: bool,
-) -> io::Result<()> {
+) -> io::Result<(usize, usize)> {
     let entries: Vec<_> = WalkDir::new(src_dir)
         .into_iter()
         .filter_map(Result::ok)
@@ -78,6 +80,9 @@ pub fn copy_incremental(
                 })
         })
         .collect();
+
+    let copied = AtomicUsize::new(0);
+    let skipped = AtomicUsize::new(0);
 
     let pb = if show_graph {
         let bar = ProgressBar::new(entries.len() as u64);
@@ -109,6 +114,7 @@ pub fn copy_incremental(
                             quiet,
                             with_timestamp,
                         );
+                        skipped.fetch_add(1, Ordering::SeqCst);
                         if let Some(ref pb) = pb {
                             pb.inc(1);
                         }
@@ -118,6 +124,7 @@ pub fn copy_incremental(
 
                 match fs::copy(src_path, &dest_path) {
                     Ok(_) => {
+                        copied.fetch_add(1, Ordering::SeqCst);
                         if let Some(ref pb) = pb {
                             pb.inc(1);
                         } else {
@@ -130,6 +137,7 @@ pub fn copy_incremental(
                         }
                     }
                     Err(e) if e.kind() == io::ErrorKind::PermissionDenied => {
+                        skipped.fetch_add(1, Ordering::SeqCst);
                         log_output(
                             &format!("Permission denied: {}", rel_path.display()),
                             logger,
@@ -141,6 +149,7 @@ pub fn copy_incremental(
                         }
                     }
                     Err(e) => {
+                        skipped.fetch_add(1, Ordering::SeqCst);
                         log_output(
                             &format!("Error copying {}: {}", rel_path.display(), e),
                             logger,
@@ -152,10 +161,14 @@ pub fn copy_incremental(
                         }
                     }
                 }
-            } else if let Some(ref pb) = pb {
-                pb.inc(1);
+            } else {
+                skipped.fetch_add(1, Ordering::SeqCst);
+                if let Some(ref pb) = pb {
+                    pb.inc(1);
+                }
             }
         } else {
+            skipped.fetch_add(1, Ordering::SeqCst);
             log_output(
                 &format!("Error comparing {}: skipped", rel_path.display()),
                 logger,
@@ -174,5 +187,5 @@ pub fn copy_incremental(
         log_output(&msg.backup_done, logger, quiet, with_timestamp);
     }
 
-    Ok(())
+    Ok((copied.load(Ordering::SeqCst), skipped.load(Ordering::SeqCst)))
 }
