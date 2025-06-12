@@ -1,3 +1,6 @@
+use chrono::Local;
+use indicatif::{ProgressBar, ProgressStyle};
+use rayon::prelude::*;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs::{self, File};
@@ -5,9 +8,6 @@ use std::io::{self, Write};
 use std::path::Path;
 use std::sync::{Arc, Mutex};
 use walkdir::WalkDir;
-use rayon::prelude::*;
-use indicatif::{ProgressBar, ProgressStyle};
-use chrono::Local;
 
 #[derive(Deserialize)]
 pub struct Messages {
@@ -24,13 +24,6 @@ pub type Logger = Option<Arc<Mutex<File>>>;
 
 pub fn now() -> String {
     Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
-}
-
-pub fn load_translations() -> io::Result<Translations> {
-    let data = include_str!("../assets/translations.json");
-    let translations: Translations = serde_json::from_str(data)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
-    Ok(translations)
 }
 
 pub fn log_output(msg: &str, logger: &Logger, quiet: bool, with_timestamp: bool) {
@@ -59,6 +52,13 @@ fn is_newer(src: &Path, dest: &Path) -> io::Result<bool> {
     Ok(src_meta.modified()? > dest_meta.modified()?)
 }
 
+pub fn load_translations() -> io::Result<Translations> {
+    let data = include_str!("../assets/translations.json");
+    let translations: Translations = serde_json::from_str(data)
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    Ok(translations)
+}
+
 pub fn copy_incremental(
     src_dir: &Path,
     dest_dir: &Path,
@@ -66,6 +66,7 @@ pub fn copy_incremental(
     show_graph: bool,
     logger: &Logger,
     quiet: bool,
+    with_timestamp: bool,
 ) -> io::Result<()> {
     let entries: Vec<_> = WalkDir::new(src_dir)
         .into_iter()
@@ -90,38 +91,87 @@ pub fn copy_incremental(
         None
     };
 
-    entries.par_iter().try_for_each(|entry| -> io::Result<()> {
+    entries.par_iter().for_each(|entry| {
         let src_path = entry.path();
-        let rel_path = src_path.strip_prefix(src_dir).unwrap();
+        let rel_path = match src_path.strip_prefix(src_dir) {
+            Ok(p) => p,
+            Err(_) => return,
+        };
         let dest_path = dest_dir.join(rel_path);
 
-        if is_newer(src_path, &dest_path)? {
-            if let Some(parent) = dest_path.parent() {
-                fs::create_dir_all(parent)?;
-            }
-            fs::copy(src_path, dest_path)?;
+        if let Ok(newer) = is_newer(src_path, &dest_path) {
+            if newer {
+                if let Some(parent) = dest_path.parent() {
+                    if let Err(e) = fs::create_dir_all(parent) {
+                        log_output(
+                            &format!("Error creating directory {}: {}", parent.display(), e),
+                            logger,
+                            quiet,
+                            with_timestamp,
+                        );
+                        if let Some(ref pb) = pb {
+                            pb.inc(1);
+                        }
+                        return;
+                    }
+                }
 
+                match fs::copy(src_path, &dest_path) {
+                    Ok(_) => {
+                        if let Some(ref pb) = pb {
+                            pb.inc(1);
+                        } else {
+                            log_output(
+                                &format!("{} {}", msg.copying_file, rel_path.display()),
+                                logger,
+                                quiet,
+                                with_timestamp,
+                            );
+                        }
+                    }
+                    Err(e) if e.kind() == io::ErrorKind::PermissionDenied => {
+                        log_output(
+                            &format!("Permission denied: {}", rel_path.display()),
+                            logger,
+                            quiet,
+                            with_timestamp,
+                        );
+                        if let Some(ref pb) = pb {
+                            pb.inc(1);
+                        }
+                    }
+                    Err(e) => {
+                        log_output(
+                            &format!("Error copying {}: {}", rel_path.display(), e),
+                            logger,
+                            quiet,
+                            with_timestamp,
+                        );
+                        if let Some(ref pb) = pb {
+                            pb.inc(1);
+                        }
+                    }
+                }
+            } else if let Some(ref pb) = pb {
+                pb.inc(1);
+            }
+        } else {
+            log_output(
+                &format!("Error comparing {}: skipped", rel_path.display()),
+                logger,
+                quiet,
+                with_timestamp,
+            );
             if let Some(ref pb) = pb {
                 pb.inc(1);
-            } else {
-                log_output(
-                    &format!("{} {}", msg.copying_file, rel_path.display()),
-                    logger,
-                    quiet,
-                    true,
-                );
             }
-        } else if let Some(ref pb) = pb {
-            pb.inc(1);
         }
-
-        Ok(())
-    })?;
+    });
 
     if let Some(pb) = pb {
         pb.finish_with_message(msg.backup_done.clone());
     } else {
-        log_output(&msg.backup_done, logger, quiet, true);
+        log_output(&msg.backup_done, logger, quiet, with_timestamp);
     }
 
     Ok(())

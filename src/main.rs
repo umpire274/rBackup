@@ -37,6 +37,10 @@ struct Args {
     /// Write output to a log file
     #[arg(long = "log", value_name = "FILE")]
     log_file: Option<PathBuf>,
+
+    /// Add timestamp to log and console output
+    #[arg(short = 't', long = "timestamp")]
+    timestamp: bool,
 }
 
 fn main() -> io::Result<()> {
@@ -96,7 +100,7 @@ fn main() -> io::Result<()> {
         std::fs::create_dir_all(destination)?;
     }
 
-    log_output("== Backup started ==", &logger, args.quiet, true);
+    log_output("== Backup started ==", &logger, args.quiet, args.timestamp);
 
     log_output(
         &format!(
@@ -108,7 +112,7 @@ fn main() -> io::Result<()> {
         ),
         &logger,
         args.quiet,
-        true,
+        args.timestamp,
     );
 
     copy_incremental(
@@ -118,9 +122,10 @@ fn main() -> io::Result<()> {
         args.show_graph,
         &logger,
         args.quiet,
+        args.timestamp,
     )?;
 
-    log_output("== Backup completed ==", &logger, args.quiet, true);
+    log_output("== Backup completed ==", &logger, args.quiet, args.timestamp);
 
     Ok(())
 }
