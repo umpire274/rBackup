@@ -96,6 +96,8 @@ fn main() -> io::Result<()> {
         std::fs::create_dir_all(destination)?;
     }
 
+    log_output("== Backup started ==", &logger, args.quiet, true);
+
     log_output(
         &format!(
             "{}\n  {}\n{}\n  {}",
@@ -106,6 +108,7 @@ fn main() -> io::Result<()> {
         ),
         &logger,
         args.quiet,
+        true,
     );
 
     copy_incremental(
@@ -116,6 +119,8 @@ fn main() -> io::Result<()> {
         &logger,
         args.quiet,
     )?;
+
+    log_output("== Backup completed ==", &logger, args.quiet, true);
 
     Ok(())
 }

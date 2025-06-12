@@ -1,6 +1,6 @@
 [package]
 name = "winrsync"
-version = "0.1.8"
+version = "0.1.9"
 edition = "2021"
 
 [dependencies]
@@ -11,6 +11,7 @@ serde_json = "1"
 sys-locale = "0.3"
 rayon = "1.10"
 indicatif = "0.17"
+chrono = "0.4"
 
 [build-dependencies]
 winres = "0.1"

@@ -7,6 +7,7 @@ use std::sync::{Arc, Mutex};
 use walkdir::WalkDir;
 use rayon::prelude::*;
 use indicatif::{ProgressBar, ProgressStyle};
+use chrono::Local;
 
 #[derive(Deserialize)]
 pub struct Messages {
@@ -21,6 +22,10 @@ pub struct Messages {
 pub type Translations = HashMap<String, Messages>;
 pub type Logger = Option<Arc<Mutex<File>>>;
 
+pub fn now() -> String {
+    Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
+}
+
 pub fn load_translations() -> io::Result<Translations> {
     let data = include_str!("../assets/translations.json");
     let translations: Translations = serde_json::from_str(data)
@@ -28,13 +33,20 @@ pub fn load_translations() -> io::Result<Translations> {
     Ok(translations)
 }
 
-pub fn log_output(msg: &str, logger: &Logger, quiet: bool) {
+pub fn log_output(msg: &str, logger: &Logger, quiet: bool, with_timestamp: bool) {
+    let full_msg = if with_timestamp {
+        format!("[{}] {}", now(), msg)
+    } else {
+        msg.to_string()
+    };
+
     if !quiet {
-        println!("{}", msg);
+        println!("{}", full_msg);
     }
+
     if let Some(file) = logger {
         let mut file = file.lock().unwrap();
-        writeln!(file, "{}", msg).ok();
+        writeln!(file, "{}", full_msg).ok();
     }
 }
 
@@ -96,6 +108,7 @@ pub fn copy_incremental(
                     &format!("{} {}", msg.copying_file, rel_path.display()),
                     logger,
                     quiet,
+                    true,
                 );
             }
         } else if let Some(ref pb) = pb {
@@ -108,7 +121,7 @@ pub fn copy_incremental(
     if let Some(pb) = pb {
         pb.finish_with_message(msg.backup_done.clone());
     } else {
-        log_output(&msg.backup_done, logger, quiet);
+        log_output(&msg.backup_done, logger, quiet, true);
     }
 
     Ok(())
