@@ -4,8 +4,9 @@ use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
-use sys_locale;
 use walkdir::WalkDir;
+#[warn(unused_imports)]
+use rayon::prelude::*;
 
 #[derive(Parser)]
 #[command(author, version, about)]
@@ -52,23 +53,32 @@ fn is_newer(src: &Path, dest: &Path) -> io::Result<bool> {
 }
 
 fn copy_incremental(src_dir: &Path, dest_dir: &Path, msg: &Messages) -> io::Result<()> {
-    for entry in WalkDir::new(src_dir) {
-        let entry = entry?;
-        let src_path = entry.path();
-        if src_path.is_file() {
-            let rel_path = src_path.strip_prefix(src_dir).unwrap();
-            let dest_path = dest_dir.join(rel_path);
+    let entries: Vec<_> = WalkDir::new(src_dir)
+        .into_iter()
+        .filter_map(Result::ok)
+        .filter(|e| {
+            e.path().is_file()
+                && !e.path().extension().map_or(false, |ext| {
+                    matches!(ext.to_str(), Some("gsheet" | "gdoc" | "gslides"))
+                })
+        })
+        .collect();
 
-            if is_newer(src_path, &dest_path)? {
-                if let Some(parent) = dest_path.parent() {
-                    fs::create_dir_all(parent)?;
-                }
-                println!("{} {}", msg.copying_file, rel_path.display());
-                fs::copy(src_path, dest_path)?;
+    entries.par_iter().try_for_each(|entry| -> io::Result<()> {
+        let src_path = entry.path();
+        let rel_path = src_path.strip_prefix(src_dir).unwrap();
+        let dest_path = dest_dir.join(rel_path);
+
+        if is_newer(src_path, &dest_path)? {
+            if let Some(parent) = dest_path.parent() {
+                fs::create_dir_all(parent)?;
             }
+            println!("{} {}", msg.copying_file, rel_path.display());
+            fs::copy(src_path, dest_path)?;
         }
-    }
-    Ok(())
+
+        Ok(())
+    })
 }
 
 fn main() -> io::Result<()> {
@@ -120,4 +130,3 @@ fn main() -> io::Result<()> {
     println!("{}", msg.backup_done);
     Ok(())
 }
-
