@@ -1,0 +1,18 @@
+{
+  "en": {
+    "starting_backup": "Backup from:",
+    "to": "to:",
+    "copying_file": "Copying:",
+    "backup_done": "Backup completed.",
+    "invalid_source": "Error: the source is not a valid directory.",
+    "language_not_supported": "Language \"{}\" not supported, falling back to \"en\"."
+  },
+  "it": {
+    "starting_backup": "Backup da:",
+    "to": "a:",
+    "copying_file": "Copio:",
+    "backup_done": "Backup completato.",
+    "invalid_source": "Errore: la sorgente non è una directory valida.",
+    "language_not_supported": "Lingua \"{}\" non supportata, uso \"en\" come fallback."
+  }
+}
