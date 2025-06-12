@@ -1,22 +1,27 @@
-use clap::Parser;
+use clap::{Parser, CommandFactory};
+use indicatif::{ProgressBar, ProgressStyle};
+use rayon::prelude::*;
 use serde::Deserialize;
 use std::collections::HashMap;
 use std::fs;
 use std::io;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
-#[warn(unused_imports)]
-use indicatif::{ProgressBar, ProgressStyle};
-use rayon::prelude::*;
 
 #[derive(Parser)]
-#[command(author, version, about)]
+#[command(
+    author = "Alessandro Maestri",
+    version,
+    about = "Incremental directory backup for Windows",
+    long_about = "winrsync: a Rust-based backup tool that copies only new or modified files from a source to a destination directory. Supports multithreading, language localization, and progress display.",
+    arg_required_else_help = true
+)]
 struct Args {
     /// Source directory
-    source: PathBuf,
+    source: Option<PathBuf>,
 
     /// Destination directory
-    destination: PathBuf,
+    destination: Option<PathBuf>,
 
     /// Language code: en or it (default: en)
     #[arg(short, long, default_value = "auto")]
@@ -27,8 +32,6 @@ struct Args {
     show_graph: bool,
 }
 
-
-#[allow(dead_code)]
 #[derive(Deserialize)]
 struct Messages {
     starting_backup: String,
@@ -59,7 +62,12 @@ fn is_newer(src: &Path, dest: &Path) -> io::Result<bool> {
     Ok(src_meta.modified()? > dest_meta.modified()?)
 }
 
-fn copy_incremental(src_dir: &Path, dest_dir: &Path, msg: &Messages, show_graph: bool) -> io::Result<()> {
+fn copy_incremental(
+    src_dir: &Path,
+    dest_dir: &Path,
+    msg: &Messages,
+    show_graph: bool,
+) -> io::Result<()> {
     let entries: Vec<_> = WalkDir::new(src_dir)
         .into_iter()
         .filter_map(Result::ok)
@@ -73,7 +81,13 @@ fn copy_incremental(src_dir: &Path, dest_dir: &Path, msg: &Messages, show_graph:
 
     let pb = if show_graph {
         let bar = ProgressBar::new(entries.len() as u64);
-        bar.set_style(ProgressStyle::with_template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len}").unwrap().progress_chars("=> "));
+        bar.set_style(
+            ProgressStyle::with_template(
+                "[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len}",
+            )
+            .unwrap()
+            .progress_chars("=> "),
+        );
         Some(bar)
     } else {
         None
@@ -105,6 +119,8 @@ fn copy_incremental(src_dir: &Path, dest_dir: &Path, msg: &Messages, show_graph:
 
     if let Some(pb) = pb {
         pb.finish_with_message(msg.backup_done.clone());
+    } else {
+        println!("{}", msg.backup_done);
     }
 
     Ok(())
@@ -112,6 +128,14 @@ fn copy_incremental(src_dir: &Path, dest_dir: &Path, msg: &Messages, show_graph:
 
 fn main() -> io::Result<()> {
     let args = Args::parse();
+
+    // Mostra help se mancano sorgente o destinazione
+    if args.source.is_none() || args.destination.is_none() {
+        eprintln!("Error: missing source or destination directory.\n");
+        Args::command().print_help().unwrap();
+        println!();
+        std::process::exit(1);
+    }
 
     let translations = load_translations()?;
 
@@ -137,25 +161,27 @@ fn main() -> io::Result<()> {
         }
     };
 
-    if !args.source.is_dir() {
+    let source = args.source.as_ref().unwrap();
+    let destination = args.destination.as_ref().unwrap();
+
+    if !source.is_dir() {
         eprintln!("{}", msg.invalid_source);
         std::process::exit(1);
     }
 
-    if !args.destination.exists() {
-        fs::create_dir_all(&args.destination)?;
+    if !destination.exists() {
+        fs::create_dir_all(&destination)?;
     }
 
     println!(
         "{}\n  {}\n{}\n  {}",
         msg.starting_backup,
-        args.source.display(),
+        source.display(),
         msg.to,
-        args.destination.display()
+        destination.display()
     );
 
-    copy_incremental(&args.source, &args.destination, msg, args.show_graph)?;
+    copy_incremental(source, destination, msg, args.show_graph)?;
 
-    println!("{}", msg.backup_done);
     Ok(())
 }
