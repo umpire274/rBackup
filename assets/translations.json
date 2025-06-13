@@ -1,6 +1,6 @@
 {
   "en": {
-    "appname": "WinRSync",
+    "appname": "rBackup",
     "starting_backup": "Backup from:",
     "to": "to:",
     "copying_file": "Copying:",
@@ -11,7 +11,7 @@
     "files_skipped": "Files skipped or failed: {}"
   },
   "it": {
-    "appname": "WinRSync",
+    "appname": "rBackup",
     "starting_backup": "Backup da:",
     "to": "a:",
     "copying_file": "Copio:",

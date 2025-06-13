@@ -11,8 +11,8 @@ use utils::{copy_incremental, load_translations, log_output, Logger};
 #[command(
     author = "Alessandro Maestri",
     version,
-    about = "Incremental directory backup for Windows",
-    long_about = "winrsync: a Rust-based backup tool that copies only new or modified files from a source to a destination directory. Supports multithreading, language localization, logging, and progress display.",
+    about = "rBackup - New incremental directory backup",
+    long_about = "rbakcup: a Rust-based backup tool that copies only new or modified files from a source to a destination directory. Supports multithreading, language localization, logging, and progress display.",
     arg_required_else_help = true
 )]
 struct Args {
@@ -48,7 +48,7 @@ fn main() -> io::Result<()> {
 
     if args.source.is_none() || args.destination.is_none() {
         eprintln!("Error: missing source or destination directory.\n");
-        Args::command().print_help().unwrap();
+        Args::command().print_help()?;
         println!();
         std::process::exit(1);
     }
