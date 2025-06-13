@@ -12,7 +12,7 @@ use utils::{copy_incremental, load_translations, log_output, Logger};
     author = "Alessandro Maestri",
     version,
     about = "rBackup - New incremental directory backup",
-    long_about = "rbakcup: a Rust-based backup tool that copies only new or modified files from a source to a destination directory. Supports multithreading, language localization, logging, and progress display.",
+    long_about = "rbackup: a Rust-based backup tool that copies only new or modified files from a source to a destination directory. Supports multithreading, language localization, logging, and progress display.",
     arg_required_else_help = true
 )]
 struct Args {
