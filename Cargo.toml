@@ -13,6 +13,9 @@ rayon = "1.10.0"
 indicatif = "0.17.11"
 chrono = "0.4.41"
 
+[target.'cfg(windows)'.build-dependencies]
+embed-resource = "2.4"
+
 [build-dependencies]
 winres = "0.1.12"
 
