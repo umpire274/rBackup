@@ -1,5 +1,7 @@
 # rbackup
 
+🇬🇧 [Read in English](README.md)
+
 **rbackup** è un'utilità da riga di comando scritta in Rust, veloce, multipiattaforma e multithread, progettata per eseguire backup incrementali di directory. Si ispira a strumenti come `rsync` e `robocopy`, ma con un focus sulla semplicità, portabilità e localizzazione.
 
 ![Licenza MIT](https://img.shields.io/badge/license-MIT-green.svg)
