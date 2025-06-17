@@ -9,6 +9,9 @@
 ![Piattaforme](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue)
 ![Versione](https://img.shields.io/badge/version-0.2.0-orange)
 
+📋 [Visualizza le modifiche recenti (Changelog)](CHANGELOG.it.md)
+
+
 ---
 
 ## ✨ Caratteristiche principali

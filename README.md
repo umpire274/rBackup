@@ -9,6 +9,9 @@
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue)
 ![Version](https://img.shields.io/badge/version-0.2.0-orange)
 
+📋 [View recent changes (Changelog)](CHANGELOG.md)
+
+
 ---
 
 ## ✨ Features
