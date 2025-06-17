@@ -10,6 +10,7 @@
 ![Version](https://img.shields.io/badge/version-0.2.0-orange)
 
 📋 [View recent changes (Changelog)](CHANGELOG.md)
+📦 Latest release: [v0.2.0](https://github.com/umpire274/rbackup/releases/tag/v0.2.0)
 
 
 ---
