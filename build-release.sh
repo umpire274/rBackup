@@ -70,6 +70,7 @@ TEMP_DIR="$(pwd)/temp_build"
 ARCHIVE_BASE="$APP_NAME-$VERSION-$TARGET"
 ARCHIVE_FULL="$DIST_DIR/$ARCHIVE_BASE$ARCHIVE_EXT"
 CHECKSUM_FILE="$DIST_DIR/$ARCHIVE_BASE.sha256"
+SIGNATURE_FILE="$ARCHIVE_FULL.asc"
 LOG_FILE="$DIST_DIR/$ARCHIVE_BASE-$TS.log"
 
 # === Verifica e installazione automatica del target ===
@@ -109,10 +110,19 @@ if [ -f "$CHECKSUM_FILE" ]; then rm "$CHECKSUM_FILE"; fi
 echo "[CHECKSUM] Calcolo SHA256..." | tee -a "$LOG_FILE"
 sha256sum "$ARCHIVE_FULL" | cut -d ' ' -f1 > "$CHECKSUM_FILE"
 
+echo "[SIGN] Firma GPG..." | tee -a "$LOG_FILE"
+if gpg --armor --detach-sign "$ARCHIVE_FULL"; then
+    echo "[OK] Firma GPG salvata: $SIGNATURE_FILE" | tee -a "$LOG_FILE"
+else
+    echo "[ERROR] Errore durante la firma GPG." | tee -a "$LOG_FILE"
+    exit 1
+fi
+
 rm -rf "$TEMP_DIR"
 
 echo "[OK] Archivio creato: $ARCHIVE_FULL"
 echo "[OK] Checksum salvato: $CHECKSUM_FILE"
+echo "[OK] Firma salvata: $SIGNATURE_FILE"
 echo "[OK] Log salvato: $LOG_FILE"
 echo
 echo "Fine procedura."
