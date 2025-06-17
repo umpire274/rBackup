@@ -5,7 +5,7 @@
 **rbackup** è un'utilità da riga di comando scritta in Rust, veloce, multipiattaforma e multithread, progettata per eseguire backup incrementali di directory. Si ispira a strumenti come `rsync` e `robocopy`, ma con un focus sulla semplicità, portabilità e localizzazione.
 
 ![CI](https://github.com/umpire274/rbackup/actions/workflows/ci.yml/badge.svg)
-![Licenza MIT](https://img.shields.io/badge/license-MIT-green.svg)
+[![Licenza MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 ![Piattaforme](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue)
 [![Versione](https://img.shields.io/badge/version-0.2.0-orange)](https://github.com/umpire274/rbackup/releases/tag/v0.2.0)
 
