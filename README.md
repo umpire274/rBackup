@@ -7,10 +7,9 @@
 ![CI](https://github.com/umpire274/rbackup/actions/workflows/ci.yml/badge.svg)
 ![MIT License](https://img.shields.io/badge/license-MIT-green.svg)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-blue)
-![Version](https://img.shields.io/badge/version-0.2.0-orange)
+[![Versione](https://img.shields.io/badge/version-0.2.0-orange)](https://github.com/umpire274/rbackup/releases/tag/v0.2.0)
 
 📋 [View recent changes (Changelog)](CHANGELOG.md)
-📦 Latest release: [v0.2.0](https://github.com/umpire274/rbackup/releases/tag/v0.2.0)
 
 
 ---
