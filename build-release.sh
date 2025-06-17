@@ -4,12 +4,13 @@ set -e
 # === SELEZIONE PIATTAFORMA ===
 echo "========================================"
 echo "Seleziona la piattaforma da compilare:"
-echo "  [1] Windows (x86_64-pc-windows-msvc)"
-echo "  [2] Linux   (x86_64-unknown-linux-gnu)"
-echo "  [3] macOS   (x86_64-apple-darwin)"
-echo "  [4] macOS Apple Silicon (aarch64-apple-darwin)"
+printf "   [1] Windows\t\t\t(x86_64-pc-windows-msvc)\n"
+printf "   [2] Linux\t\t\t(x86_64-unknown-linux-gnu)\n"
+printf "   [3] macOS Intel\t\t(x86_64-apple-darwin)\n"
+printf "   [4] macOS Apple Silicon\t(aarch64-apple-darwin)\n"
+printf "   [5] FreeBSD\t\t\t(x86_64-unknown-freebsd)\n"
 echo "========================================"
-read -rp "Inserisci il numero della piattaforma [1-4]: " CHOICE
+read -rp "Inserisci il numero della piattaforma [1-5] o [0] per uscire: " CHOICE
 
 case $CHOICE in
     1)
@@ -36,6 +37,15 @@ case $CHOICE in
         ARCHIVE_EXT=".tar.gz"
         USE_ZIP=0
         ;;
+    5)
+        TARGET="x86_64-unknown-freebsd"
+        EXT=""
+        ARCHIVE_EXT=".tar.gz"
+        USE_ZIP=0
+        ;;
+    0)
+        exit 0;
+        ;;
     *)
         echo "Errore: selezione non valida."
         exit 1
@@ -43,17 +53,35 @@ case $CHOICE in
 esac
 
 echo
+
 APP_NAME="rbackup"
 VERSION=$(grep '^version =' Cargo.toml | cut -d '"' -f2)
 TS=$(date +"%Y%m%d_%H%M%S")
 
 DIST_DIR="$(pwd)/dist"
-OUT_DIR="$(pwd)/target/$TARGET/release"
+
+if [ -n "$CARGO_TARGET_DIR" ]; then
+  OUT_DIR="$CARGO_TARGET_DIR/$TARGET/release"
+else
+  OUT_DIR="$(pwd)/target/$TARGET/release"
+fi
+
 TEMP_DIR="$(pwd)/temp_build"
 ARCHIVE_BASE="$APP_NAME-$VERSION-$TARGET"
 ARCHIVE_FULL="$DIST_DIR/$ARCHIVE_BASE$ARCHIVE_EXT"
 CHECKSUM_FILE="$DIST_DIR/$ARCHIVE_BASE.sha256"
 LOG_FILE="$DIST_DIR/$ARCHIVE_BASE-$TS.log"
+
+# === Verifica e installazione automatica del target ===
+if ! rustup target list --installed | grep -q "^$TARGET$"; then
+  echo "[INFO] Il target '$TARGET' non è installato. Installo..." | tee -a "$LOG_FILE"
+  if rustup target add "$TARGET"; then
+    echo "[OK] Target: '$TARGET' installato con successo." | tee -a "$LOG_FILE"
+  else
+    echo "[ERROR] Impossibile installare il target '$TARGET'. Lo script viene interrotto."
+    exit 1
+  fi
+fi
 
 mkdir -p "$DIST_DIR"
 rm -rf "$TEMP_DIR"

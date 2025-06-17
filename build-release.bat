@@ -8,8 +8,9 @@ echo   [1] Windows (x86_64-pc-windows-msvc)
 echo   [2] Linux   (x86_64-unknown-linux-gnu)
 echo   [3] macOS   (x86_64-apple-darwin)
 echo   [4] macOS Apple Silicon (aarch64-apple-darwin)
+echo   [5] FreeBSD (x86_64-unknown-freebsd)
 echo ========================================
-set /p CHOICE=Inserisci il numero della piattaforma [1-4]:
+set /p CHOICE=Inserisci il numero della piattaforma [1-5] o [0] per uscire:
 
 if "%CHOICE%"=="1" (
     set "TARGET=x86_64-pc-windows-msvc"
@@ -31,6 +32,13 @@ if "%CHOICE%"=="1" (
     set "EXT="
     set "ARCHIVE_EXT=.tar.gz"
     set "USE_ZIP=0"
+) else if "%CHOICE%"=="5" (
+    set "TARGET=x86_64-unknown-freebsd"
+    set "EXT="
+    set "ARCHIVE_EXT=.tar.gz"
+    set "USE_ZIP=0"
+) else if "%CHOICE%"=="0" (
+	exit 0
 ) else (
     echo Errore: selezione non valida.
     exit /b 1
@@ -60,6 +68,23 @@ set "ARCHIVE_BASE=%APP_NAME%-%VERSION%-%TARGET%"
 set "ARCHIVE_FULL=%DIST_DIR%\%ARCHIVE_BASE%%ARCHIVE_EXT%"
 set "CHECKSUM_FILE=%DIST_DIR%\%ARCHIVE_BASE%.sha256"
 set "LOG_FILE=%DIST_DIR%\%ARCHIVE_BASE%-%TS%.log"
+
+:: === Verifica e installazione automatica del target ===
+echo  [INFO] Verifica se il target "%TARGET%" è installato... >> "%LOG_FILE%"
+rustup target list --installed | findstr /C:"%TARGET%" >nul
+if errorlevel 1 (
+	echo [INFO] Target non trovato. Installo... >> "%LOG_FILE%"
+	rustup target add %TARGET% >> "%LOG_FILE%" 2>&1
+	if errorlevel 1 (
+		echo [ERROR] Impossibile installare il target %TARGET%. Lo script viene interrotto. >> "%LOG_FILE%"
+		echo Errore: installazione del target fallita. Vedi il log: %LOG_FILE%
+		exit /b 1
+	) else (
+		echo [OK] Target %TARGET% installato con successo. >> "%LOG_FILE%"
+	)
+) else (
+	echo [OK] Target %TARGET% già installato. >> "%LOG_FILE%"
+)
 
 :: Crea directory di output
 if not exist "%DIST_DIR%" mkdir "%DIST_DIR%"
