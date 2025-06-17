@@ -67,7 +67,7 @@ rbackup ~/Documenti /mnt/backup_usb/Documenti
 | `-V`, `--version`       | Mostra la versione                     |
 | `-h`, `--help`          | Mostra la guida                        |
 
-> Con `--lang auto (default)`, la lingua viene rilevata automaticamente dal sistema operativo.
+> Con `--lang auto` (default), la lingua viene rilevata automaticamente dal sistema operativo.
 
 ---
 
