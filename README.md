@@ -36,6 +36,46 @@ Precompiled binaries are available in the [Releases](https://github.com/umpire27
 | Linux    | x86_64       | `rbackup-linux-x86_64-v0.2.0.tar.gz` |
 | macOS    | x86_64       | `rbackup-macos-x86_64-v0.2.0.tar.gz` |
 
+---
+
+## 🔐 GPG Signature
+
+All release archives are cryptographically signed with GPG.
+
+- `.sig` files contain the ASCII-armored detached signature for the corresponding archive.
+- You can verify the archive with:
+
+```bash
+gpg --verify rbackup-<version>-<target>.tar.gz.sig rbackup-<version>-<target>.tar.gz
+```
+
+---
+
+## 🔑 Public Key
+
+The releases are signed with the following GPG key:
+
+* Key ID: 423FABCE0A1921FB
+* Fingerprint: 8118 9716 9512 2A32 1F3D C04C 423F ABCE 0A19 21FB
+* Download: https://github.com/umpire274.gpg
+
+To import the key from a keyserver:
+
+```sh
+gpg --recv-keys 423FABCE0A1921FB
+```
+
+Or from OpenPGP server:
+
+```sh
+gpg --keyserver keys.openpgp.org --recv-keys 423FABCE0A1921FB
+```
+
+Then verify the fingerprint:
+
+```sh
+gpg --fingerprint 423FABCE0A1921FB
+```
 
 ---
 
