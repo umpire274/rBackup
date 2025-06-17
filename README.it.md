@@ -28,7 +28,7 @@
 
 ## 📥 Download
 
-I binari precompilati sono disponibili nella sezione [Releases](https://github.com/tuo-utente/rbackup/releases).
+I binari precompilati sono disponibili nella sezione [Releases](https://github.com/umpire274/rbackup/releases).
 
 | Piattaforma | Architettura | File |
 |-------------|--------------|------|
@@ -36,7 +36,6 @@ I binari precompilati sono disponibili nella sezione [Releases](https://github.c
 | Linux       | x86_64       | `rbackup-linux-x86_64-v0.2.0.tar.gz` |
 | macOS       | x86_64       | `rbackup-macos-x86_64-v0.2.0.tar.gz` |
 
-> Sostituisci `tuo-utente` con il tuo nome utente GitHub.
 
 ---
 
@@ -68,7 +67,7 @@ rbackup ~/Documenti /mnt/backup_usb/Documenti
 | `-V`, `--version`       | Mostra la versione                     |
 | `-h`, `--help`          | Mostra la guida                        |
 
-> Con --lang auto (default), la lingua viene rilevata automaticamente dal sistema operativo.
+> Con `--lang auto (default)`, la lingua viene rilevata automaticamente dal sistema operativo.
 
 ---
 

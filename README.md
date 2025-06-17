@@ -67,7 +67,7 @@ rbackup ~/Documents /mnt/backup_drive/Documents
 | `-V`, `--version`     | Show version                     |
 | `-h`, `--help`        | Show help message                |
 
-> With --lang auto (default), the language is automatically detected from the operating system.
+> With `--lang auto (default)`, the language is automatically detected from the operating system.
 
 ---
 
