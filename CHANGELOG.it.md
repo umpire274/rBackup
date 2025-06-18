@@ -6,7 +6,7 @@ Tutte le modifiche rilevanti apportate al progetto `rbackup`.
 
 ---
 
-## [0.2.5] – 13/06/2025
+## [0.2.5] – 2025-06-18
 
 ### Modifiche
 - Windows: La richiesta dei privilegi di amministratore è ora gestita dinamicamente a runtime utilizzando il crate [`windows`](https://crates.io/crates/windows), invece di affidarsi a manifest file incorporati.
