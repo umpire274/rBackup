@@ -6,6 +6,16 @@ All notable changes to the `rbackup` project will be documented in this file.
 
 ---
 
+## [0.2.5] – 2025-06-13
+
+### Changed
+- Windows: The elevation to Administrator privileges is now managed dynamically at runtime using the [`windows`](https://crates.io/crates/windows) crate, instead of relying on embedded manifest files.
+- The request for elevation now occurs **only when required**, after argument validation and outside help/version/test-only modes.
+
+### Notes
+- This improves portability and avoids UAC prompts when not needed.
+
+---
 ## [0.2.0] - 2025-06-13
 
 ### ✨ Added
