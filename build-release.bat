@@ -134,16 +134,11 @@ echo [CHECKSUM] Calcolo SHA256... >> "%LOG_FILE%"
 powershell -NoProfile -Command "(Get-FileHash -Path '%ARCHIVE_FULL%' -Algorithm SHA256).Hash | Out-File -Encoding ascii -FilePath '%CHECKSUM_FILE%'"
 
 :: Firma con GPG (se disponibile)
-set "SIGNATURE_FILE=%ARCHIVE_FULL%.sig"
+set "SIGNATURE_FILE=%ARCHIVE_FULL%.asc"
 where gpg >nul 2>&1
 if %errorlevel% equ 0 (
     echo [GPG] Firma dell'archivio... >> "%LOG_FILE%"
     gpg --output "%SIGNATURE_FILE%" --detach-sign --armor "%ARCHIVE_FULL%" >> "%LOG_FILE%" 2>&1
-    if exist "%SIGNATURE_FILE%" (
-        echo [OK] Firma GPG salvata: %SIGNATURE_FILE%
-    ) else (
-        echo [WARN] Firma GPG non riuscita.
-    )
 ) else (
     echo [WARN] gpg non trovato. Firma GPG saltata.
 )
@@ -154,7 +149,11 @@ rmdir /s /q "%TEMP_DIR%"
 :: Messaggi finali
 echo [OK] Archivio creato: %ARCHIVE_FULL%
 echo [OK] Checksum salvato: %CHECKSUM_FILE%
-if exist "%SIGNATURE_FILE%" echo [OK] Firma GPG salvata: %SIGNATURE_FILE%
+if exist "%SIGNATURE_FILE%" (
+    echo [OK] Firma GPG salvata: %SIGNATURE_FILE%
+) else (
+    echo [WARN] Firma GPG non riuscita.
+)
 echo [OK] Log salvato: %LOG_FILE%
 
 echo(
