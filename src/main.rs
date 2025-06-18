@@ -1,13 +1,15 @@
 mod utils;
+mod elevator;
 
 use clap::{Parser, CommandFactory};
+use elevator::require_admin;
 use std::fs::File;
 use std::io;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use utils::{copy_incremental, load_translations, log_output, Logger};
 
-#[derive(Parser)]
+#[derive(Parser, Debug)]
 #[command(
     author = "Alessandro Maestri",
     version,
@@ -41,17 +43,24 @@ struct Args {
     /// Add timestamp to log and console output
     #[arg(short = 't', long = "timestamp")]
     timestamp: bool,
+
 }
 
 fn main() -> io::Result<()> {
     let args = Args::parse();
 
-    if args.source.is_none() || args.destination.is_none() {
-        eprintln!("Error: missing source or destination directory.\n");
-        Args::command().print_help()?;
-        println!();
-        std::process::exit(1);
+    // Mostra help o version senza elevazione
+    if args.show_graph || args.quiet || args.log_file.is_none() && (args.source.is_none() || args.destination.is_none()) {
+        if args.source.is_none() || args.destination.is_none() {
+            eprintln!("Error: missing source or destination directory.\n");
+            Args::command().print_help()?;
+            println!();
+            std::process::exit(1);
+        }
     }
+
+    // Elevazione solo se serve
+    require_admin();
 
     let logger: Logger = if let Some(ref path) = args.log_file {
         match File::create(path) {

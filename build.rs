@@ -1,6 +1,6 @@
 #[cfg(target_os = "windows")]
 fn main() {
-    embed_resource::compile("rbackup.rc", std::iter::empty::<&str>());
+    // Niente da fare su Windows
 }
 
 #[cfg(not(target_os = "windows"))]
