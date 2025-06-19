@@ -8,17 +8,6 @@ Tutte le modifiche rilevanti apportate al progetto `rbackup`.
 
 ## [0.2.5] – 2025-06-18
 
-### Modifiche
-- Windows: La richiesta dei privilegi di amministratore è ora gestita dinamicamente a runtime utilizzando il crate [`windows`](https://crates.io/crates/windows), invece di affidarsi a manifest file incorporati.
-- L'elevazione viene richiesta **solo quando necessaria**, dopo la validazione dei parametri e non in modalità help, versione o test.
-
-### Note
-- Questo migliora la portabilità e riduce le richieste UAC non necessarie.
-
----
-
-## [0.2.0] - 2025-06-13
-
 ### ✨ Nuove funzionalità
 - **Multilingua**: supporto per italiano e inglese (`--lang`)
 - **Progress bar**: con opzione `--graph` per mostrare barra grafica
@@ -34,6 +23,11 @@ Tutte le modifiche rilevanti apportate al progetto `rbackup`.
 - Separazione di `main.rs` e `utils.rs`
 - Integrazione di `clap`, `indicatif`, `rayon`, `walkdir`, `crossterm`
 - Incorporazione del file `translations.json` in fase di compilazione
+- Windows: La richiesta dei privilegi di amministratore è ora gestita dinamicamente a runtime utilizzando il crate [`windows`](https://crates.io/crates/windows), invece di affidarsi a manifest file incorporati.
+- L'elevazione viene richiesta **solo quando necessaria**, dopo la validazione dei parametri e non in modalità help, versione o test.
+
+### Note
+- Questo migliora la portabilità e riduce le richieste UAC non necessarie.
 
 ---
 
