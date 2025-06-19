@@ -34,7 +34,7 @@ All notable changes to the `rbackup` project will be documented in this file.
 ## [0.1.0] - 2025-06-10
 
 ### 🧱 Initial release
-- Created initial project `winrsync` for one-way incremental backup
+- Created initial project `rBackup` for one-way incremental backup
 - Inspired by `robocopy` and `rsync`
 - Command line arguments for source and destination
 - First working build for Windows only
