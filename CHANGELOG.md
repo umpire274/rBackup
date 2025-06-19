@@ -23,8 +23,6 @@ All notable changes to the `rbackup` project will be documented in this file.
 - Code split into `main.rs` and `utils.rs`
 - Uses `clap`, `indicatif`, `rayon`, `walkdir`, `crossterm`
 - Embeds `translations.json` at compile time
-
-### Changed
 - Windows: The elevation to Administrator privileges is now managed dynamically at runtime using the [`windows`](https://crates.io/crates/windows) crate, instead of relying on embedded manifest files.
 - The request for elevation now occurs **only when required**, after argument validation and outside help/version/test-only modes.
 
