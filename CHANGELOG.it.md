@@ -34,7 +34,7 @@ Tutte le modifiche rilevanti apportate al progetto `rbackup`.
 ## [0.1.0] - 2025-06-10
 
 ### 🧱 Iniziale
-- Creazione progetto `winrsync` per backup incrementale unidirezionale
+- Creazione progetto `rBackup` per backup incrementale unidirezionale
 - Uso di `robocopy` come ispirazione
 - Parametri da linea di comando per sorgente e destinazione
 - Prima versione funzionante solo per Windows
