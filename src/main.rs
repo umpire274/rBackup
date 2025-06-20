@@ -1,5 +1,6 @@
 mod utils;
 mod elevator;
+mod ui;
 
 use clap::{Parser, CommandFactory};
 use elevator::require_admin;
@@ -44,11 +45,19 @@ struct Args {
     #[arg(short = 't', long = "timestamp")]
     timestamp: bool,
 
+    /// Run graphical progress bar test
+    #[arg(short='T', long = "test_ui")]
+    test_ui: bool,
 }
 
 fn main() -> io::Result<()> {
     let args = Args::parse();
 
+    if args.test_ui {
+        utils::test_ui_progress();
+        return Ok(());
+    }
+    
     // Mostra help o version senza elevazione
     if args.show_graph || args.quiet || args.log_file.is_none() && (args.source.is_none() || args.destination.is_none()) {
         if args.source.is_none() || args.destination.is_none() {
