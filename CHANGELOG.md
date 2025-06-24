@@ -6,6 +6,24 @@ All notable changes to the `rbackup` project will be documented in this file.
 
 ---
 
+## [0.2.6] - 2025-06-24
+
+### Added
+- Introduced the `-T` / `--test_ui` parameter (hidden from help) to preview progress bar behavior in CLI.
+
+### Changed
+- Refactored code for improved structure and readability.
+- Adjusted formatting and logic to satisfy `cargo clippy` and CI build checks across:
+  - macOS (Intel & Apple Silicon)
+  - Ubuntu Linux
+  - Windows (MSVC)
+
+### Notes
+- This version introduces no functional changes for end users.
+- The `--test_ui` option is intended solely for internal development and will not appear in standard help.
+
+---
+
 ## [0.2.5] – 2025-06-18
 
 ### ✨ Added
