@@ -75,9 +75,10 @@ pub fn copy_incremental(
         .filter_map(Result::ok)
         .filter(|e| {
             e.path().is_file()
-                && !e.path().extension().map_or(false, |ext| {
+                && !e.path().extension().is_some_and(|ext| {
                     matches!(ext.to_str(), Some("gsheet" | "gdoc" | "gslides"))
                 })
+
         })
         .collect();
 
@@ -199,13 +200,14 @@ pub fn test_ui_progress() {
     use crate::ui::{draw_ui, copy_ended};
 
     // Esempio di "file da copiare"
-    let files = vec![
+    let files = [
         "/home/user/Documents/report.pdf",
         "/home/user/Pictures/photo.jpg",
         "/home/user/Videos/video.mp4",
         "/home/user/Work/presentation.pptx",
         "/home/user/Backup/archive.zip",
     ];
+
 
     let total = files.len();
 

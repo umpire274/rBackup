@@ -59,13 +59,12 @@ fn main() -> io::Result<()> {
     }
     
     // Mostra help o version senza elevazione
-    if args.show_graph || args.quiet || args.log_file.is_none() && (args.source.is_none() || args.destination.is_none()) {
-        if args.source.is_none() || args.destination.is_none() {
-            eprintln!("Error: missing source or destination directory.\n");
-            Args::command().print_help()?;
-            println!();
-            std::process::exit(1);
-        }
+    if (args.show_graph || args.quiet || args.log_file.is_none()) && 
+        (args.source.is_none() || args.destination.is_none()) {
+        eprintln!("Error: missing source or destination directory.\n");
+        Args::command().print_help()?;
+        println!();
+        std::process::exit(1);
     }
 
     // Elevazione solo se serve
