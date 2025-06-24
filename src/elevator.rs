@@ -1,12 +1,16 @@
 #[cfg(target_os = "windows")]
 pub fn require_admin() {
-    use std::process::Command;
     use std::env;
-    
+    use std::process::Command;
+
     if !is_running_as_admin() {
         let args: Vec<String> = env::args().collect();
         let mut cmd = Command::new("powershell");
-        let params = format!("Start-Process -Verb runAs -FilePath '{}' -ArgumentList '{}'", &args[0], &args[1..].join(" "));
+        let params = format!(
+            "Start-Process -Verb runAs -FilePath '{}' -ArgumentList '{}'",
+            &args[0],
+            &args[1..].join(" ")
+        );
         let _ = cmd.arg("-Command").arg(params).status();
         std::process::exit(0);
     }
@@ -14,10 +18,10 @@ pub fn require_admin() {
 
 #[cfg(target_os = "windows")]
 fn is_running_as_admin() -> bool {
+    use windows::Win32::Foundation::*;
     use windows::Win32::Security::*;
     use windows::Win32::System::Threading::*;
-    use windows::Win32::Foundation::*;
-    
+
     unsafe {
         let mut token_handle: HANDLE = HANDLE::default();
         if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token_handle).as_bool() {

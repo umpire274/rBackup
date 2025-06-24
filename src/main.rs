@@ -1,8 +1,8 @@
-mod utils;
 mod elevator;
 mod ui;
+mod utils;
 
-use clap::{Parser, CommandFactory};
+use clap::{CommandFactory, Parser};
 use elevator::require_admin;
 use std::fs::File;
 use std::io;
@@ -46,7 +46,7 @@ struct Args {
     timestamp: bool,
 
     /// Run graphical progress bar test
-    #[arg(short='T', long = "test_ui")]
+    #[arg(short = 'T', long = "test_ui")]
     test_ui: bool,
 }
 
@@ -57,10 +57,11 @@ fn main() -> io::Result<()> {
         utils::test_ui_progress();
         return Ok(());
     }
-    
+
     // Mostra help o version senza elevazione
-    if (args.show_graph || args.quiet || args.log_file.is_none()) && 
-        (args.source.is_none() || args.destination.is_none()) {
+    if (args.show_graph || args.quiet || args.log_file.is_none())
+        && (args.source.is_none() || args.destination.is_none())
+    {
         eprintln!("Error: missing source or destination directory.\n");
         Args::command().print_help()?;
         println!();
@@ -94,12 +95,12 @@ fn main() -> io::Result<()> {
     let msg = match translations.get(&lang_code) {
         Some(messages) => messages,
         None => {
-            let fallback = translations.get("en").expect("English translations missing");
+            let fallback = translations
+                .get("en")
+                .expect("English translations missing");
             eprintln!(
                 "{}",
-                fallback
-                    .language_not_supported
-                    .replace("{}", &lang_code)
+                fallback.language_not_supported.replace("{}", &lang_code)
             );
             fallback
         }
@@ -142,7 +143,12 @@ fn main() -> io::Result<()> {
         args.timestamp,
     )?;
 
-    log_output("== Backup completed ==", &logger, args.quiet, args.timestamp);
+    log_output(
+        "== Backup completed ==",
+        &logger,
+        args.quiet,
+        args.timestamp,
+    );
     log_output(
         &msg.files_copied.replace("{}", &copied.to_string()),
         &logger,

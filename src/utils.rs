@@ -6,7 +6,10 @@ use std::collections::HashMap;
 use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::Path;
-use std::sync::{Arc, Mutex, atomic::{AtomicUsize, Ordering}};
+use std::sync::{
+    atomic::{AtomicUsize, Ordering},
+    Arc, Mutex,
+};
 use walkdir::WalkDir;
 
 #[derive(Deserialize)]
@@ -56,8 +59,8 @@ fn is_newer(src: &Path, dest: &Path) -> io::Result<bool> {
 
 pub fn load_translations() -> io::Result<Translations> {
     let data = include_str!("../assets/translations.json");
-    let translations: Translations = serde_json::from_str(data)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    let translations: Translations =
+        serde_json::from_str(data).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
     Ok(translations)
 }
 
@@ -75,10 +78,10 @@ pub fn copy_incremental(
         .filter_map(Result::ok)
         .filter(|e| {
             e.path().is_file()
-                && !e.path().extension().is_some_and(|ext| {
-                    matches!(ext.to_str(), Some("gsheet" | "gdoc" | "gslides"))
-                })
-
+                && !e
+                    .path()
+                    .extension()
+                    .is_some_and(|ext| matches!(ext.to_str(), Some("gsheet" | "gdoc" | "gslides")))
         })
         .collect();
 
@@ -188,16 +191,16 @@ pub fn copy_incremental(
         log_output(&msg.backup_done, logger, quiet, with_timestamp);
     }
 
-    Ok((copied.load(Ordering::SeqCst), skipped.load(Ordering::SeqCst)))
+    Ok((
+        copied.load(Ordering::SeqCst),
+        skipped.load(Ordering::SeqCst),
+    ))
 }
 
 pub fn test_ui_progress() {
-    use crossterm::{
-        execute,
-        terminal::EnterAlternateScreen,
-    };
+    use crate::ui::{copy_ended, draw_ui};
+    use crossterm::{execute, terminal::EnterAlternateScreen};
     use std::{io::stdout, thread::sleep, time::Duration};
-    use crate::ui::{draw_ui, copy_ended};
 
     // Esempio di "file da copiare"
     let files = [
@@ -208,12 +211,11 @@ pub fn test_ui_progress() {
         "/home/user/Backup/archive.zip",
     ];
 
-
     let total = files.len();
 
     // Entra in modalità schermo alternativo
     execute!(stdout(), EnterAlternateScreen).unwrap();
-    let mut row=0;
+    let mut row = 0;
 
     for (i, file) in files.iter().enumerate() {
         let copied = i + 1;
@@ -224,5 +226,5 @@ pub fn test_ui_progress() {
     }
 
     // Fine
-    copy_ended(row+3);
+    copy_ended(row + 3);
 }
