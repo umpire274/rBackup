@@ -23,6 +23,12 @@
 
 ---
 
+## 📦 Installation
+
+[![Packaging status](https://repology.org/badge/vertical-allrepos/rbackup.svg)](https://repology.org/project/rbackup/versions)
+
+---
+
 ## 📥 Download
 
 Precompiled binaries are available in the [Releases](https://github.com/umpire274/rbackup/releases) section.
