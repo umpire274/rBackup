@@ -53,6 +53,29 @@ struct Args {
 fn main() -> io::Result<()> {
     let args = Args::parse();
 
+    let translations = load_translations()?;
+    let lang_code = if args.lang == "auto" {
+        sys_locale::get_locale()
+            .and_then(|val| val.split(&['_', '-']).next().map(str::to_lowercase))
+            .unwrap_or_else(|| "en".to_string())
+    } else {
+        args.lang.to_lowercase()
+    };
+
+    let msg = match translations.get(&lang_code) {
+        Some(messages) => messages,
+        None => {
+            let fallback = translations
+                .get("en")
+                .expect("English translations missing");
+            eprintln!(
+                "{}",
+                fallback.language_not_supported.replace("{}", &lang_code)
+            );
+            fallback
+        }
+    };
+
     if args.test_ui {
         utils::test_ui_progress();
         return Ok(());
@@ -81,29 +104,6 @@ fn main() -> io::Result<()> {
         }
     } else {
         None
-    };
-
-    let translations = load_translations()?;
-    let lang_code = if args.lang == "auto" {
-        sys_locale::get_locale()
-            .and_then(|val| val.split(&['_', '-']).next().map(str::to_lowercase))
-            .unwrap_or_else(|| "en".to_string())
-    } else {
-        args.lang.to_lowercase()
-    };
-
-    let msg = match translations.get(&lang_code) {
-        Some(messages) => messages,
-        None => {
-            let fallback = translations
-                .get("en")
-                .expect("English translations missing");
-            eprintln!(
-                "{}",
-                fallback.language_not_supported.replace("{}", &lang_code)
-            );
-            fallback
-        }
     };
 
     let source = args.source.as_ref().unwrap();
