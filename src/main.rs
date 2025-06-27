@@ -118,7 +118,12 @@ fn main() -> io::Result<()> {
         std::fs::create_dir_all(destination)?;
     }
 
-    log_output(msg.backup_init.as_str(), &logger, args.quiet, args.timestamp);
+    log_output(
+        msg.backup_init.as_str(),
+        &logger,
+        args.quiet,
+        args.timestamp,
+    );
 
     log_output(
         &format!(
