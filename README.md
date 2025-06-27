@@ -39,7 +39,6 @@ Precompiled binaries are available in the [Releases](https://github.com/umpire27
 | Linux    | x86_64       | `rbackup-<version>-unknown-linux-gnu.tar.gz` |
 | macOS    | x86_64       | `rbackup-<version>-x86_64-apple-darwin.tar.gz` |
 | macOS    | aarch64      | `rbackup-<version>-aarch64-apple-darwin.tar.gz` |
-| FreeBSD  | x86_64       | coming soon |
 
 ---
 
