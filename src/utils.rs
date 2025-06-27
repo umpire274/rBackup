@@ -43,12 +43,12 @@ pub fn log_output(msg: &str, logger: &Logger, quiet: bool, with_timestamp: bool)
     };
 
     if !quiet {
-        println!("{}", full_msg);
+        println!("{full_msg}");
     }
 
     if let Some(file) = logger {
         let mut file = file.lock().unwrap();
-        writeln!(file, "{}", full_msg).ok();
+        writeln!(file, "{full_msg}").ok();
     }
 }
 

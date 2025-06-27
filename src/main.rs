@@ -98,7 +98,7 @@ fn main() -> io::Result<()> {
         match File::create(path) {
             Ok(file) => Some(Arc::new(Mutex::new(file))),
             Err(e) => {
-                eprintln!("Failed to create log file: {}", e);
+                eprintln!("Failed to create log file: {e}");
                 std::process::exit(1);
             }
         }
