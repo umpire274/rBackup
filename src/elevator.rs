@@ -29,7 +29,7 @@ pub fn is_running_as_admin() -> bool {
             size,
             &mut size,
         )
-            .as_bool()
+        .as_bool()
         {
             CloseHandle(token_handle);
             return false;
