@@ -77,7 +77,7 @@ fn main() -> io::Result<()> {
     };
 
     if args.test_ui {
-        utils::test_ui_progress();
+        utils::test_ui_progress(msg);
         return Ok(());
     }
 
@@ -118,7 +118,7 @@ fn main() -> io::Result<()> {
         std::fs::create_dir_all(destination)?;
     }
 
-    log_output("== Backup started ==", &logger, args.quiet, args.timestamp);
+    log_output(msg.backup_init.as_str(), &logger, args.quiet, args.timestamp);
 
     log_output(
         &format!(
@@ -144,7 +144,7 @@ fn main() -> io::Result<()> {
     )?;
 
     log_output(
-        "== Backup completed ==",
+        msg.backup_ended.as_str(),
         &logger,
         args.quiet,
         args.timestamp,

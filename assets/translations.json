@@ -1,6 +1,8 @@
 {
   "en": {
     "appname": "rBackup",
+    "backup_init": "=== Backup started ===",
+    "backup_ended": "=== Backup ended ===",
     "starting_backup": "Backup from:",
     "to": "to:",
     "copying_file": "Copying:",
@@ -8,10 +10,14 @@
     "invalid_source": "Error: the source is not a valid directory.",
     "language_not_supported": "Language \"{}\" not supported, falling back to \"en\".",
     "files_copied": "Files copied: {}",
-    "files_skipped": "Files skipped or failed: {}"
+    "files_skipped": "Files skipped or failed: {}",
+    "copy_progress": "Copy progress:",
+    "file": "file"
   },
   "it": {
     "appname": "rBackup",
+    "backup_init": "=== Backup iniziato ===",
+    "backup_ended": "=== Backup terminato ===",
     "starting_backup": "Backup da:",
     "to": "a:",
     "copying_file": "Copio:",
@@ -19,6 +25,8 @@
     "invalid_source": "Errore: la sorgente non è una directory valida.",
     "language_not_supported": "Lingua \"{}\" non supportata, uso \"en\" come fallback.",
     "files_copied": "File copiati: {}",
-    "files_skipped": "File saltati o falliti: {}"
+    "files_skipped": "File saltati o falliti: {}",
+    "copy_progress": "Avanzamento copia:",
+    "file": "file"
   }
 }

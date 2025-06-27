@@ -14,6 +14,8 @@ use walkdir::WalkDir;
 
 #[derive(Deserialize)]
 pub struct Messages {
+    pub backup_init: String,
+    pub backup_ended: String,
     pub starting_backup: String,
     pub to: String,
     pub copying_file: String,
@@ -22,6 +24,8 @@ pub struct Messages {
     pub language_not_supported: String,
     pub files_copied: String,
     pub files_skipped: String,
+    pub copy_progress: String,
+    pub file: String,
 }
 
 pub type Translations = HashMap<String, Messages>;
@@ -197,7 +201,7 @@ pub fn copy_incremental(
     ))
 }
 
-pub fn test_ui_progress() {
+pub fn test_ui_progress(msg: &Messages) {
     use crate::ui::{copy_ended, draw_ui};
     use crossterm::{execute, terminal::EnterAlternateScreen};
     use std::{io::stdout, thread::sleep, time::Duration};
@@ -220,11 +224,11 @@ pub fn test_ui_progress() {
     for (i, file) in files.iter().enumerate() {
         let copied = i + 1;
 
-        draw_ui(file, row, copied as f32, total as f32);
+        draw_ui(file, row, copied as f32, total as f32, msg);
         row += 1;
         sleep(Duration::from_millis(700));
     }
 
     // Fine
-    copy_ended(row + 3);
+    copy_ended(row + 3, msg);
 }
