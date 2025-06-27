@@ -2,8 +2,9 @@ mod elevator;
 mod ui;
 mod utils;
 
+#[cfg(windows)]
+use crate::elevator::require_admin;
 use clap::{CommandFactory, Parser};
-use elevator::require_admin;
 use std::fs::File;
 use std::io;
 use std::path::PathBuf;
@@ -50,6 +51,10 @@ struct Args {
     test_ui: bool,
 }
 
+fn requires_admin(args: &Args) -> bool {
+    args.source.is_some() && args.destination.is_some() && !args.test_ui
+}
+
 fn main() -> io::Result<()> {
     let args = Args::parse();
 
@@ -92,7 +97,10 @@ fn main() -> io::Result<()> {
     }
 
     // Elevazione solo se serve
-    require_admin();
+    if requires_admin(&args) {
+        #[cfg(windows)]
+        require_admin();
+    }
 
     let logger: Logger = if let Some(ref path) = args.log_file {
         match File::create(path) {
