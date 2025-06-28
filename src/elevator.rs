@@ -1,11 +1,8 @@
 #![cfg(windows)]
 
-use windows::core::Result;
 use windows::Win32::{
     Foundation::CloseHandle,
-    Security::{
-        GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_INFORMATION_CLASS, TOKEN_QUERY,
-    },
+    Security::{GetTokenInformation, TOKEN_ELEVATION, TOKEN_INFORMATION_CLASS, TOKEN_QUERY},
     System::Threading::{GetCurrentProcess, OpenProcessToken},
 };
 
@@ -14,16 +11,17 @@ pub fn is_running_as_admin() -> bool {
         let mut token_handle = std::mem::zeroed();
 
         // Apri il token del processo corrente
-        if let Err(_) = OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token_handle) {
+        if OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token_handle).is_err() {
             return false;
         }
 
         let mut elevation = TOKEN_ELEVATION::default();
         let mut size = std::mem::size_of::<TOKEN_ELEVATION>() as u32;
 
+        // 7 = TokenElevation (non esposto direttamente come costante)
         let result = GetTokenInformation(
             token_handle,
-            TOKEN_INFORMATION_CLASS::TokenElevation,
+            TOKEN_INFORMATION_CLASS(7),
             Some(&mut elevation as *mut _ as *mut _),
             size,
             &mut size,
@@ -31,10 +29,7 @@ pub fn is_running_as_admin() -> bool {
 
         CloseHandle(token_handle);
 
-        match result {
-            Ok(_) => elevation.TokenIsElevated != 0,
-            Err(_) => false,
-        }
+        result.is_ok() && elevation.TokenIsElevated != 0
     }
 }
 
