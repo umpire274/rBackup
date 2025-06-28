@@ -27,7 +27,7 @@ pub fn is_running_as_admin() -> bool {
             &mut size,
         );
 
-        CloseHandle(token_handle);
+        let _ = CloseHandle(token_handle);
 
         result.is_ok() && elevation.TokenIsElevated != 0
     }
