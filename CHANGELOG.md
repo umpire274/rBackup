@@ -6,6 +6,20 @@ All notable changes to the `rbackup` project will be documented in this file.
 
 ---
 
+## [0.2.7] – 2025-06-26
+
+### ✨ Changed
+
+- Improved the CLI test progress bar (`--test_ui`) with better layout and live file display during test runs.
+- Centralized translation system now applied across all user-facing messages via `translations.json`.
+
+### Notes
+
+- The `--test_ui` flag is still intended for internal testing only.
+- No functional changes for end users in normal usage.
+
+---
+
 ## [0.2.6] - 2025-06-24
 
 ### Added
