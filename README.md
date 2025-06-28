@@ -108,6 +108,7 @@ rbackup ~/Documents /mnt/backup_drive/Documents
 | `-t`, `--timestamp`   | Prepend timestamp to messages    |
 | `--log <FILE>`        | Write output to a log file       |
 | `-l`, `--lang <code>` | Force language (e.g. `en`, `it`) |
+| `-T`, `--test_ui`     | Run graphical progress bar test  |
 | `-V`, `--version`     | Show version                     |
 | `-h`, `--help`        | Show help message                |
 
