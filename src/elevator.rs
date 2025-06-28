@@ -1,10 +1,10 @@
 #![cfg(windows)]
 
-use std::ptr::null_mut;
 use windows::Win32::{
     Foundation::{CloseHandle, HANDLE},
     Security::{
-        GetTokenInformation, TokenElevation, TOKEN_ELEVATION, TOKEN_INFORMATION_CLASS, TOKEN_QUERY,
+        GetTokenInformation, TokenElevationType, TokenElevationTypeDefault, TokenElevationTypeFull,
+        TOKEN_ELEVATION_TYPE, TOKEN_INFORMATION_CLASS, TOKEN_QUERY,
     },
     System::Threading::{GetCurrentProcess, OpenProcessToken},
 };
@@ -13,30 +13,30 @@ pub fn is_running_as_admin() -> bool {
     unsafe {
         let mut token_handle = HANDLE::default();
 
-        // Open the access token for the current process
-        if !OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token_handle).as_bool() {
+        // Apri il token di accesso al processo corrente
+        let result = OpenProcessToken(GetCurrentProcess(), TOKEN_QUERY, &mut token_handle);
+        if result.0 == 0 {
             return false;
         }
 
-        let mut elevation = TOKEN_ELEVATION::default();
-        let mut size = std::mem::size_of::<TOKEN_ELEVATION>() as u32;
+        let mut elevation_type = TOKEN_ELEVATION_TYPE::default();
+        let mut returned_length = std::mem::size_of::<TOKEN_ELEVATION_TYPE>() as u32;
 
-        // Get elevation information
-        if !GetTokenInformation(
+        let result = GetTokenInformation(
             token_handle,
-            TOKEN_INFORMATION_CLASS::TokenElevation,
-            Some(&mut elevation as *mut _ as *mut _),
-            size,
-            &mut size,
-        )
-        .as_bool()
-        {
-            CloseHandle(token_handle);
-            return false;
-        }
+            TOKEN_INFORMATION_CLASS(18), // TokenElevationType
+            Some(&mut elevation_type as *mut _ as *mut _),
+            returned_length,
+            &mut returned_length,
+        );
 
         CloseHandle(token_handle);
-        elevation.TokenIsElevated != 0
+
+        if result.0 == 0 {
+            return false;
+        }
+
+        elevation_type == TokenElevationTypeFull
     }
 }
 
