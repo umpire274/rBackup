@@ -1,9 +1,6 @@
-mod elevator;
 mod ui;
 mod utils;
 
-#[cfg(windows)]
-use crate::elevator::require_admin;
 use clap::{CommandFactory, Parser};
 use std::fs::File;
 use std::io;
@@ -45,14 +42,6 @@ struct Args {
     /// Add timestamp to log and console output
     #[arg(short = 't', long = "timestamp")]
     timestamp: bool,
-
-    /// Run graphical progress bar test
-    #[arg(short = 'T', long = "test_ui")]
-    test_ui: bool,
-}
-
-fn requires_admin(args: &Args) -> bool {
-    args.source.is_some() && args.destination.is_some() && !args.test_ui
 }
 
 fn main() -> io::Result<()> {
@@ -81,11 +70,6 @@ fn main() -> io::Result<()> {
         }
     };
 
-    if args.test_ui {
-        utils::test_ui_progress(msg);
-        return Ok(());
-    }
-
     // Mostra help o version senza elevazione
     if (args.show_graph || args.quiet || args.log_file.is_none())
         && (args.source.is_none() || args.destination.is_none())
@@ -94,12 +78,6 @@ fn main() -> io::Result<()> {
         Args::command().print_help()?;
         println!();
         std::process::exit(1);
-    }
-
-    // Elevazione solo se serve
-    if requires_admin(&args) {
-        #[cfg(windows)]
-        require_admin();
     }
 
     let logger: Logger = if let Some(ref path) = args.log_file {
@@ -150,7 +128,6 @@ fn main() -> io::Result<()> {
         source,
         destination,
         msg,
-        args.show_graph,
         &logger,
         args.quiet,
         args.timestamp,

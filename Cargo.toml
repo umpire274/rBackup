@@ -1,34 +1,40 @@
 [package]
 name = "rbackup"
-version = "0.2.7"
-authors = ["Alessandro Maestri"]
+version = "0.3.0"
 edition = "2021"
-rust-version = "1.87"
-readme = "README.md"
-repository = "https://github.com/umpire274/rBackup"
-homepage = "https://github.com/umpire274/rBackup"
 license = "MIT"
-description = "Fast and portable incremental backup CLI tool inspired by rsync and robocopy."
+description = "Incremental, cross-platform and multithreaded backup tool written in Rust"
+readme = "README.md"
+homepage = "https://github.com/umpire274/rbackup"
+repository = "https://github.com/umpire274/rbackup"
+keywords = ["backup", "cli", "rsync", "robocopy", "multiplatform"]
 categories = ["command-line-utilities", "filesystem"]
-keywords = ["backup", "incremental", "cli", "multithread", "portable"]
+exclude = ["/dist/*", "/temp_build/*"]
 
 [dependencies]
-walkdir = "2.5.0"
-clap = { version = "4.5.40", features = ["derive"] }
-serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.140"
-sys-locale = "0.3.2"
-rayon = "1.10.0"
-indicatif = "0.17.11"
-chrono = "0.4.41"
+clap = { version = "4.5.41", features = ["derive"] }
 crossterm = "0.29.0"
+walkdir = "2.5.0"
+serde = { version = "1.0.219", features = ["derive"] }
+serde_json = "1.0.141"
+chrono = "0.4.41"
+sys-locale = "0.3.2"
+terminal_size = "0.4.2"
+rayon = "1.10.0"
 
-[target.'cfg(windows)'.dependencies]
-windows = { version = "0.61.3", features = ["Win32_System_Threading", "Win32_Foundation", "Win32_Security"] }
-windows-sys = "0.60.2"
-
-[target.'cfg(windows)'.build-dependencies]
-embed-resource = "3.0.4"
+# Windows-specific APIs via `windows` crate
+[target.'cfg(windows)'.dependencies.windows]
+version = "0.61"
+features = [
+    "Win32_Foundation",
+    "Win32_Security",
+    "Win32_System_Threading",
+    "Win32_UI_Shell"
+]
 
 [build-dependencies]
+# Risorse per l'eseguibile Windows (icone, manifest)
 winres = "0.1.12"
+
+[target.'cfg(windows)'.build-dependencies]
+embed-resource = "3.0.5"

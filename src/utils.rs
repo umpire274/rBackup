@@ -1,15 +1,19 @@
+use crate::ui::{draw_ui, print_above_progress};
 use chrono::Local;
-use indicatif::{ProgressBar, ProgressStyle};
-use rayon::prelude::*;
 use serde::Deserialize;
 use std::collections::HashMap;
-use std::fs::{self, File};
-use std::io::{self, Write};
-use std::path::Path;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc, Mutex,
+use std::{
+    fs::{self, File},
+    io::{self, Write},
+    path::Path,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, Mutex,
+    },
+    thread::sleep,
+    time::Duration,
 };
+use terminal_size::{terminal_size, Height};
 use walkdir::WalkDir;
 
 #[derive(Deserialize)]
@@ -37,9 +41,9 @@ pub fn now() -> String {
 
 pub fn log_output(msg: &str, logger: &Logger, quiet: bool, with_timestamp: bool) {
     let full_msg = if with_timestamp {
-        format!("[{}] {}", now(), msg)
+        format!("\n\n[{}] {}", now(), msg)
     } else {
-        msg.to_string()
+        format!("{}", msg.to_string())
     };
 
     if !quiet {
@@ -50,15 +54,6 @@ pub fn log_output(msg: &str, logger: &Logger, quiet: bool, with_timestamp: bool)
         let mut file = file.lock().unwrap();
         writeln!(file, "{full_msg}").ok();
     }
-}
-
-fn is_newer(src: &Path, dest: &Path) -> io::Result<bool> {
-    if !dest.exists() {
-        return Ok(true);
-    }
-    let src_meta = src.metadata()?;
-    let dest_meta = dest.metadata()?;
-    Ok(src_meta.modified()? > dest_meta.modified()?)
 }
 
 pub fn load_translations() -> io::Result<Translations> {
@@ -72,7 +67,6 @@ pub fn copy_incremental(
     src_dir: &Path,
     dest_dir: &Path,
     msg: &Messages,
-    show_graph: bool,
     logger: &Logger,
     quiet: bool,
     with_timestamp: bool,
@@ -80,31 +74,22 @@ pub fn copy_incremental(
     let entries: Vec<_> = WalkDir::new(src_dir)
         .into_iter()
         .filter_map(Result::ok)
-        .filter(|e| {
-            e.path().is_file()
-                && !e
-                    .path()
-                    .extension()
-                    .is_some_and(|ext| matches!(ext.to_str(), Some("gsheet" | "gdoc" | "gslides")))
-        })
+        .filter(|e| e.path().is_file())
         .collect();
 
     let copied = AtomicUsize::new(0);
     let skipped = AtomicUsize::new(0);
+    let total_files = entries.len();
 
-    let pb = if show_graph {
-        let bar = ProgressBar::new(entries.len() as u64);
-        bar.set_style(
-            ProgressStyle::with_template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len}")
-                .unwrap()
-                .progress_chars("=> "),
-        );
-        Some(bar)
-    } else {
-        None
+    let term_height = match terminal_size() {
+        Some((_, Height(h))) => h,
+        _ => 25,
     };
 
-    entries.par_iter().for_each(|entry| {
+    let log_row = term_height.saturating_sub(3);
+    let mut row = 0;
+
+    entries.iter().enumerate().for_each(|(_i, entry)| {
         let src_path = entry.path();
         let rel_path = match src_path.strip_prefix(src_dir) {
             Ok(p) => p,
@@ -112,88 +97,35 @@ pub fn copy_incremental(
         };
         let dest_path = dest_dir.join(rel_path);
 
-        if let Ok(newer) = is_newer(src_path, &dest_path) {
-            if newer {
-                if let Some(parent) = dest_path.parent() {
-                    if let Err(e) = fs::create_dir_all(parent) {
-                        log_output(
-                            &format!("Error creating directory {}: {}", parent.display(), e),
-                            logger,
-                            quiet,
-                            with_timestamp,
-                        );
-                        skipped.fetch_add(1, Ordering::SeqCst);
-                        if let Some(ref pb) = pb {
-                            pb.inc(1);
-                        }
-                        return;
-                    }
-                }
+        let message = format!("{} {}", msg.copying_file, rel_path.display());
+        print_above_progress(&message, row);
 
-                match fs::copy(src_path, &dest_path) {
-                    Ok(_) => {
-                        copied.fetch_add(1, Ordering::SeqCst);
-                        if let Some(ref pb) = pb {
-                            pb.inc(1);
-                        } else {
-                            log_output(
-                                &format!("{} {}", msg.copying_file, rel_path.display()),
-                                logger,
-                                quiet,
-                                with_timestamp,
-                            );
-                        }
-                    }
-                    Err(e) if e.kind() == io::ErrorKind::PermissionDenied => {
-                        skipped.fetch_add(1, Ordering::SeqCst);
-                        log_output(
-                            &format!("Permission denied: {}", rel_path.display()),
-                            logger,
-                            quiet,
-                            with_timestamp,
-                        );
-                        if let Some(ref pb) = pb {
-                            pb.inc(1);
-                        }
-                    }
-                    Err(e) => {
-                        skipped.fetch_add(1, Ordering::SeqCst);
-                        log_output(
-                            &format!("Error copying {}: {}", rel_path.display(), e),
-                            logger,
-                            quiet,
-                            with_timestamp,
-                        );
-                        if let Some(ref pb) = pb {
-                            pb.inc(1);
-                        }
-                    }
-                }
-            } else {
-                skipped.fetch_add(1, Ordering::SeqCst);
-                if let Some(ref pb) = pb {
-                    pb.inc(1);
-                }
+        if let Some(parent) = dest_path.parent() {
+            fs::create_dir_all(parent).ok();
+        }
+
+        match fs::copy(src_path, &dest_path) {
+            Ok(_) => {
+                copied.fetch_add(1, Ordering::SeqCst);
             }
-        } else {
-            skipped.fetch_add(1, Ordering::SeqCst);
-            log_output(
-                &format!("Error comparing {}: skipped", rel_path.display()),
-                logger,
-                quiet,
-                with_timestamp,
-            );
-            if let Some(ref pb) = pb {
-                pb.inc(1);
+            Err(_) => {
+                skipped.fetch_add(1, Ordering::SeqCst);
             }
         }
-    });
 
-    if let Some(pb) = pb {
-        pb.finish_with_message(msg.backup_done.clone());
-    } else {
-        log_output(&msg.backup_done, logger, quiet, with_timestamp);
-    }
+        draw_ui(
+            &format!("{}", rel_path.display()),
+            copied.load(Ordering::SeqCst) as f32,
+            total_files as f32,
+            msg,
+        );
+
+        if row < log_row {
+            row += 1;
+        }
+
+        sleep(Duration::from_millis(40));
+    });
 
     Ok((
         copied.load(Ordering::SeqCst),
@@ -201,7 +133,7 @@ pub fn copy_incremental(
     ))
 }
 
-pub fn test_ui_progress(msg: &Messages) {
+/*pub fn test_ui_progress(msg: &Messages) {
     use crate::ui::{copy_ended, draw_ui};
     use crossterm::{execute, terminal::EnterAlternateScreen};
     use std::{io::stdout, thread::sleep, time::Duration};
@@ -231,4 +163,4 @@ pub fn test_ui_progress(msg: &Messages) {
 
     // Fine
     copy_ended(row + 3, msg);
-}
+}*/
