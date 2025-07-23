@@ -1,7 +1,6 @@
 mod ui;
 mod utils;
 
-#[cfg(windows)]
 use clap::{CommandFactory, Parser};
 use std::fs::File;
 use std::io;
