@@ -4,8 +4,8 @@
 
 ![CI](https://github.com/umpire274/rbackup/actions/workflows/ci.yml/badge.svg)
 [![Licenza MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
-[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20FreeBSD-blue)](https://github.com/umpire274/rBackup/releases)
-[![Versione](https://img.shields.io/badge/version-0.2.6-orange)](https://github.com/umpire274/rbackup/releases/tag/v0.2.6)
+[![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS%20Intel%20%7C%20macOS%20Apple%20Silicon-blue)](https://github.com/umpire274/rBackup/releases)
+[![Versione](https://img.shields.io/badge/version-0.2.7-orange)](https://github.com/umpire274/rbackup/releases/tag/v0.2.7)
 
 📋 [View recent changes (Changelog)](CHANGELOG.md)
 
@@ -37,8 +37,8 @@ Precompiled binaries are available in the [Releases](https://github.com/umpire27
 |----------|--------------|------|
 | Windows  | x86_64       | `rbackup-<version>-x86_64-pc-windows-msvc.zip` |
 | Linux    | x86_64       | `rbackup-<version>-unknown-linux-gnu.tar.gz` |
-| macOS    | x86_64       | `rbackup-<version>-x86_64-apple-darwin.tar.gz` |
-| macOS    | aarch64      | `rbackup-<version>-aarch64-apple-darwin.tar.gz` |
+| macOS Intel Architecture   | x86_64       | `rbackup-<version>-x86_64-apple-darwin.tar.gz` |
+| macOS Apple Silicon   | aarch64      | `rbackup-<version>-aarch64-apple-darwin.tar.gz` |
 
 ---
 
@@ -108,6 +108,7 @@ rbackup ~/Documents /mnt/backup_drive/Documents
 | `-t`, `--timestamp`   | Prepend timestamp to messages    |
 | `--log <FILE>`        | Write output to a log file       |
 | `-l`, `--lang <code>` | Force language (e.g. `en`, `it`) |
+| `-T`, `--test_ui`     | Run graphical progress bar test  |
 | `-V`, `--version`     | Show version                     |
 | `-h`, `--help`        | Show help message                |
 
