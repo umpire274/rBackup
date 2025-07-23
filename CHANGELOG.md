@@ -6,6 +6,22 @@ All notable changes to the `rbackup` project will be documented in this file.
 
 ---
 
+## [0.2.8] – 2025-07-23
+
+### ✅ Fixed
+
+- **Fixes Issue #1**: ["This program must be run as administrator"](https://github.com/umpire274/rBackup/issues/1) – now the application runs on **Windows** without requiring elevated privileges.
+- **Code cleanup**: removed Windows-specific elevation code (`elevator.rs` was removed).
+- **CI fixes**: corrected GitHub Actions workflow for all platforms.
+- **Macro derive fix**: added missing `use clap::Parser;` and corrected all `#[arg(...)]` and `#[command(...)]` attributes.
+
+### Notes
+
+- No functional changes for macOS and Linux users.
+- Verified correct CLI behavior with combined `--graph`, `--log`, and `--timestamp` options.
+
+---
+
 ## [0.2.7] – 2025-06-26
 
 ### ✨ Changed
