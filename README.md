@@ -37,8 +37,8 @@ Precompiled binaries are available in the [Releases](https://github.com/umpire27
 |----------|--------------|------|
 | Windows  | x86_64       | `rbackup-<version>-x86_64-pc-windows-msvc.zip` |
 | Linux    | x86_64       | `rbackup-<version>-unknown-linux-gnu.tar.gz` |
-| macOS    | x86_64       | `rbackup-<version>-x86_64-apple-darwin.tar.gz` |
-| macOS    | aarch64      | `rbackup-<version>-aarch64-apple-darwin.tar.gz` |
+| macOS Intel Architecture   | x86_64       | `rbackup-<version>-x86_64-apple-darwin.tar.gz` |
+| macOS Apple Silicon   | aarch64      | `rbackup-<version>-aarch64-apple-darwin.tar.gz` |
 
 ---
 
