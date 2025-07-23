@@ -1,11 +1,12 @@
-use crate::utils::Messages;
 use crossterm::{
-    cursor::{MoveTo, RestorePosition, SavePosition},
+    cursor::MoveTo,
     execute,
-    style::Print,
+    style::{Color, Print, SetForegroundColor},
     terminal::{Clear, ClearType},
 };
 use std::io::{stdout, Write};
+
+use crate::utils::Messages;
 
 pub fn draw_ui(file: &str, copied: f32, total: f32, msg: &Messages) {
     let progress = copied / total;
@@ -17,41 +18,45 @@ pub fn draw_ui(file: &str, copied: f32, total: f32, msg: &Messages) {
 
     let bar = format!("[{}{}]", "█".repeat(filled), "░".repeat(empty));
 
-    // Stampa normale del messaggio "Copio: ..." con println!
-    println!("{} {}", msg.copying_file, file);
+    let file_line = format!("{} {}", msg.copying_file, file);
+    let progress_line = format!(
+        "{}: file {}/{} ({:.0}%) {}",
+        msg.copy_progress, copied as usize, total as usize, percent, bar
+    );
 
-    // Salva posizione corrente del cursore
-    let mut stdout = stdout();
-    execute!(stdout, SavePosition).unwrap();
+    let (_cols, rows) = crossterm::terminal::size().unwrap_or((80, 24));
+    let progress_row = rows.saturating_sub(1);
+    let file_row = progress_row.saturating_sub(1);
 
-    // Sposta il cursore in basso (ultima riga), cancella e stampa la barra
-    let (_cols, rows) = crossterm::terminal::size().unwrap();
-    execute!(
-        stdout,
-        MoveTo(0, rows - 1),
-        Clear(ClearType::CurrentLine),
-        Print(format!(
-            "{} file {}/{} ({}%) {}",
-            msg.copy_progress, copied as u32, total as u32, percent, bar
-        )),
-        RestorePosition
-    )
-    .unwrap();
-
-    stdout.flush().unwrap();
-}
-
-pub fn copy_ended(msg: &Messages) {
-    println!("\n{}", msg.backup_done);
-}
-
-pub fn print_above_progress(message: &str, line: u16) {
     execute!(
         stdout(),
-        MoveTo(0, line),
+        MoveTo(0, file_row),
+        Clear(ClearType::FromCursorDown),
+        Print(file_line),
+        MoveTo(0, progress_row),
         Clear(ClearType::CurrentLine),
-        Print(message)
+        Print(progress_line),
     )
     .unwrap();
+
     stdout().flush().unwrap();
+}
+
+pub fn copy_ended(row: u16, msg: &Messages) {
+    use crossterm::style::ResetColor;
+
+    execute!(
+        stdout(),
+        MoveTo(0, row),
+        Clear(ClearType::CurrentLine),
+        ResetColor,
+        Print(format!(
+            "
+[{}] === {} ===
+",
+            crate::utils::now(),
+            msg.backup_done
+        ))
+    )
+    .unwrap();
 }

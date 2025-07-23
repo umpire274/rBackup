@@ -1,4 +1,4 @@
-use crate::ui::{draw_ui, print_above_progress};
+use crate::ui::draw_ui;
 use chrono::Local;
 use serde::Deserialize;
 use std::collections::HashMap;
@@ -29,7 +29,6 @@ pub struct Messages {
     pub files_copied: String,
     pub files_skipped: String,
     pub copy_progress: String,
-    pub file: String,
 }
 
 pub type Translations = HashMap<String, Messages>;
@@ -67,9 +66,9 @@ pub fn copy_incremental(
     src_dir: &Path,
     dest_dir: &Path,
     msg: &Messages,
-    logger: &Logger,
-    quiet: bool,
-    with_timestamp: bool,
+    _logger: &Logger,
+    _quiet: bool,
+    _with_timestamp: bool,
 ) -> io::Result<(usize, usize)> {
     let entries: Vec<_> = WalkDir::new(src_dir)
         .into_iter()
@@ -96,9 +95,6 @@ pub fn copy_incremental(
             Err(_) => return,
         };
         let dest_path = dest_dir.join(rel_path);
-
-        let message = format!("{} {}", msg.copying_file, rel_path.display());
-        print_above_progress(&message, row);
 
         if let Some(parent) = dest_path.parent() {
             fs::create_dir_all(parent).ok();

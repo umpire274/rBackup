@@ -11,8 +11,7 @@
     "language_not_supported": "Language \"{}\" not supported, falling back to \"en\".",
     "files_copied": "Files copied: {}",
     "files_skipped": "Files skipped or failed: {}",
-    "copy_progress": "Copy progress:",
-    "file": "file"
+    "copy_progress": "Copy progress:"
   },
   "it": {
     "appname": "rBackup",
@@ -26,7 +25,6 @@
     "language_not_supported": "Lingua \"{}\" non supportata, uso \"en\" come fallback.",
     "files_copied": "File copiati: {}",
     "files_skipped": "File saltati o falliti: {}",
-    "copy_progress": "Avanzamento copia:",
-    "file": "file"
+    "copy_progress": "Avanzamento copia:"
   }
 }
