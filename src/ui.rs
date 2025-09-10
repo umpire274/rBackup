@@ -41,22 +41,3 @@ pub fn draw_ui(file: &str, copied: f32, total: f32, msg: &Messages) {
 
     stdout().flush().unwrap();
 }
-
-/*pub fn copy_ended(row: u16, msg: &Messages) {
-    use crossterm::style::ResetColor;
-
-    execute!(
-        stdout(),
-        MoveTo(0, row),
-        Clear(ClearType::CurrentLine),
-        ResetColor,
-        Print(format!(
-            "
-[{}] === {} ===
-",
-            crate::utils::now(),
-            msg.backup_done
-        ))
-    )
-    .unwrap();
-}*/
