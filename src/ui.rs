@@ -1,7 +1,7 @@
 use crossterm::{
     cursor::MoveTo,
     execute,
-    style::{Color, Print, SetForegroundColor},
+    style::Print,
     terminal::{Clear, ClearType},
 };
 use std::io::{stdout, Write};
