@@ -113,7 +113,7 @@ fn main() -> io::Result<()> {
 
     log_output(
         &format!(
-            "{}\n  {}\n{}\n  {}",
+            "{} {} {} {}\n\n",
             msg.starting_backup,
             source.display(),
             msg.to,
@@ -134,7 +134,7 @@ fn main() -> io::Result<()> {
     )?;
 
     log_output(
-        msg.backup_ended.as_str(),
+        format!("\n\n{}", msg.backup_ended.as_str()).as_str(),
         &logger,
         args.quiet,
         args.timestamp,
