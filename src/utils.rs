@@ -55,6 +55,15 @@ pub fn log_output(msg: &str, logger: &Logger, quiet: bool, with_timestamp: bool)
     }
 }
 
+fn is_newer(src: &Path, dest: &Path) -> io::Result<bool> {
+    if !dest.exists() {
+        return Ok(true);
+    }
+    let src_meta = fs::metadata(src)?;
+    let dest_meta = fs::metadata(dest)?;
+    Ok(src_meta.modified()? > dest_meta.modified()?)
+}
+
 pub fn load_translations() -> io::Result<Translations> {
     let data = include_str!("../assets/translations.json");
     let translations: Translations =
@@ -100,9 +109,17 @@ pub fn copy_incremental(
             fs::create_dir_all(parent).ok();
         }
 
-        match fs::copy(src_path, &dest_path) {
-            Ok(_) => {
-                copied.fetch_add(1, Ordering::SeqCst);
+        match is_newer(src_path, &dest_path) {
+            Ok(true) => match fs::copy(src_path, &dest_path) {
+                Ok(_) => {
+                    copied.fetch_add(1, Ordering::SeqCst);
+                }
+                Err(_) => {
+                    skipped.fetch_add(1, Ordering::SeqCst);
+                }
+            },
+            Ok(false) => {
+                skipped.fetch_add(1, Ordering::SeqCst);
             }
             Err(_) => {
                 skipped.fetch_add(1, Ordering::SeqCst);
@@ -111,7 +128,7 @@ pub fn copy_incremental(
 
         draw_ui(
             &format!("{}", rel_path.display()),
-            copied.load(Ordering::SeqCst) as f32,
+            (copied.load(Ordering::SeqCst) + skipped.load(Ordering::SeqCst)) as f32,
             total_files as f32,
             msg,
         );
