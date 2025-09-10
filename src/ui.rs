@@ -42,7 +42,7 @@ pub fn draw_ui(file: &str, copied: f32, total: f32, msg: &Messages) {
     stdout().flush().unwrap();
 }
 
-pub fn copy_ended(row: u16, msg: &Messages) {
+/*pub fn copy_ended(row: u16, msg: &Messages) {
     use crossterm::style::ResetColor;
 
     execute!(
@@ -59,4 +59,4 @@ pub fn copy_ended(row: u16, msg: &Messages) {
         ))
     )
     .unwrap();
-}
+}*/

@@ -23,12 +23,14 @@ pub struct Messages {
     pub starting_backup: String,
     pub to: String,
     pub copying_file: String,
-    pub backup_done: String,
+    //    pub backup_done: String,
     pub invalid_source: String,
     pub language_not_supported: String,
     pub files_copied: String,
     pub files_skipped: String,
     pub copy_progress: String,
+    pub copied_file: String,
+    pub skipped_file: String,
 }
 
 pub type Translations = HashMap<String, Messages>;
@@ -109,25 +111,24 @@ pub fn copy_incremental(
             fs::create_dir_all(parent).ok();
         }
 
-        match is_newer(src_path, &dest_path) {
-            Ok(true) => match fs::copy(src_path, &dest_path) {
+        let status = if let Ok(true) = is_newer(src_path, &dest_path) {
+            match fs::copy(src_path, &dest_path) {
                 Ok(_) => {
                     copied.fetch_add(1, Ordering::SeqCst);
+                    &msg.copied_file
                 }
                 Err(_) => {
                     skipped.fetch_add(1, Ordering::SeqCst);
+                    &msg.skipped_file
                 }
-            },
-            Ok(false) => {
-                skipped.fetch_add(1, Ordering::SeqCst);
             }
-            Err(_) => {
-                skipped.fetch_add(1, Ordering::SeqCst);
-            }
-        }
+        } else {
+            skipped.fetch_add(1, Ordering::SeqCst);
+            &msg.skipped_file
+        };
 
         draw_ui(
-            &format!("{}", rel_path.display()),
+            &format!("{} - {}", src_path.display(), status),
             (copied.load(Ordering::SeqCst) + skipped.load(Ordering::SeqCst)) as f32,
             total_files as f32,
             msg,
