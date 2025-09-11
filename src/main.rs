@@ -2,8 +2,11 @@ mod ui;
 mod utils;
 
 use clap::{CommandFactory, Parser};
+use crossterm::terminal::{Clear, ClearType};
+use crossterm::{execute, terminal};
 use std::fs::File;
 use std::io;
+use std::io::stdout;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use utils::{copy_incremental, load_translations, log_output, Logger};
@@ -27,10 +30,6 @@ struct Args {
     #[arg(short, long, default_value = "auto")]
     lang: String,
 
-    /// Show graphical progress bar instead of filenames
-    #[arg(short = 'g', long = "graph")]
-    show_graph: bool,
-
     /// Quiet mode: suppress console output
     #[arg(short = 'q', long = "quiet")]
     quiet: bool,
@@ -42,10 +41,10 @@ struct Args {
     /// Add timestamp to log and console output
     #[arg(short = 't', long = "timestamp")]
     timestamp: bool,
+}
 
-    /// Run graphical progress bar test
-    #[arg(short = 'T', long = "test_ui")]
-    test_ui: bool,
+fn clear_terminal() {
+    execute!(stdout(), Clear(ClearType::All)).unwrap();
 }
 
 fn main() -> io::Result<()> {
@@ -74,13 +73,8 @@ fn main() -> io::Result<()> {
         }
     };
 
-    if args.test_ui {
-        utils::test_ui_progress(msg);
-        return Ok(());
-    }
-
     // Mostra help o version senza elevazione
-    if (args.show_graph || args.quiet || args.log_file.is_none())
+    if (args.quiet || args.log_file.is_none())
         && (args.source.is_none() || args.destination.is_none())
     {
         eprintln!("Error: missing source or destination directory.\n");
@@ -113,6 +107,8 @@ fn main() -> io::Result<()> {
         std::fs::create_dir_all(destination)?;
     }
 
+    clear_terminal();
+
     log_output(
         msg.backup_init.as_str(),
         &logger,
@@ -122,7 +118,7 @@ fn main() -> io::Result<()> {
 
     log_output(
         &format!(
-            "{}\n  {}\n{}\n  {}",
+            "{} {} {} {}\n\n\n\n",
             msg.starting_backup,
             source.display(),
             msg.to,
@@ -133,18 +129,21 @@ fn main() -> io::Result<()> {
         args.timestamp,
     );
 
+    let (_cols, rows) = terminal::size().unwrap_or((80, 24));
+    let progress_row = rows.saturating_sub(1);
+
     let (copied, skipped) = copy_incremental(
         source,
         destination,
         msg,
-        args.show_graph,
         &logger,
         args.quiet,
         args.timestamp,
+        progress_row,
     )?;
 
     log_output(
-        msg.backup_ended.as_str(),
+        format!("\n\n{}", msg.backup_ended.as_str()).as_str(),
         &logger,
         args.quiet,
         args.timestamp,

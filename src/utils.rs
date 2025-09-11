@@ -1,14 +1,22 @@
+use crate::ui::draw_ui;
 use chrono::Local;
-use indicatif::{ProgressBar, ProgressStyle};
-use rayon::prelude::*;
+use crossterm::cursor::MoveTo;
+use crossterm::execute;
+use crossterm::style::{Print, ResetColor};
+use crossterm::terminal::{Clear, ClearType};
 use serde::Deserialize;
-use std::collections::HashMap;
-use std::fs::{self, File};
-use std::io::{self, Write};
-use std::path::Path;
-use std::sync::{
-    atomic::{AtomicUsize, Ordering},
-    Arc, Mutex,
+use std::io::stdout;
+use std::{
+    collections::HashMap,
+    fs::{self, File},
+    io::{self, Write},
+    path::Path,
+    sync::{
+        atomic::{AtomicUsize, Ordering},
+        Arc, Mutex,
+    },
+    thread::sleep,
+    time::Duration,
 };
 use walkdir::WalkDir;
 
@@ -19,13 +27,14 @@ pub struct Messages {
     pub starting_backup: String,
     pub to: String,
     pub copying_file: String,
-    pub backup_done: String,
+    //    pub backup_done: String,
     pub invalid_source: String,
     pub language_not_supported: String,
     pub files_copied: String,
     pub files_skipped: String,
     pub copy_progress: String,
-    pub file: String,
+    pub copied_file: String,
+    pub skipped_file: String,
 }
 
 pub type Translations = HashMap<String, Messages>;
@@ -37,7 +46,7 @@ pub fn now() -> String {
 
 pub fn log_output(msg: &str, logger: &Logger, quiet: bool, with_timestamp: bool) {
     let full_msg = if with_timestamp {
-        format!("[{}] {}", now(), msg)
+        format!("\n\n[{}] {}", now(), msg)
     } else {
         msg.to_string()
     };
@@ -72,163 +81,75 @@ pub fn copy_incremental(
     src_dir: &Path,
     dest_dir: &Path,
     msg: &Messages,
-    show_graph: bool,
-    logger: &Logger,
-    quiet: bool,
-    with_timestamp: bool,
+    _logger: &Logger,
+    _quiet: bool,
+    _with_timestamp: bool,
+    progress_row: u16,
 ) -> io::Result<(usize, usize)> {
     let entries: Vec<_> = WalkDir::new(src_dir)
         .into_iter()
         .filter_map(Result::ok)
-        .filter(|e| {
-            e.path().is_file()
-                && !e
-                    .path()
-                    .extension()
-                    .is_some_and(|ext| matches!(ext.to_str(), Some("gsheet" | "gdoc" | "gslides")))
-        })
+        .filter(|e| e.path().is_file())
         .collect();
 
     let copied = AtomicUsize::new(0);
     let skipped = AtomicUsize::new(0);
+    let total_files = entries.len();
 
-    let pb = if show_graph {
-        let bar = ProgressBar::new(entries.len() as u64);
-        bar.set_style(
-            ProgressStyle::with_template("[{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len}")
-                .unwrap()
-                .progress_chars("=> "),
-        );
-        Some(bar)
-    } else {
-        None
-    };
-
-    entries.par_iter().for_each(|entry| {
+    for entry in entries {
         let src_path = entry.path();
         let rel_path = match src_path.strip_prefix(src_dir) {
             Ok(p) => p,
-            Err(_) => return,
+            Err(_) => continue,
         };
         let dest_path = dest_dir.join(rel_path);
 
-        if let Ok(newer) = is_newer(src_path, &dest_path) {
-            if newer {
-                if let Some(parent) = dest_path.parent() {
-                    if let Err(e) = fs::create_dir_all(parent) {
-                        log_output(
-                            &format!("Error creating directory {}: {}", parent.display(), e),
-                            logger,
-                            quiet,
-                            with_timestamp,
-                        );
-                        skipped.fetch_add(1, Ordering::SeqCst);
-                        if let Some(ref pb) = pb {
-                            pb.inc(1);
-                        }
-                        return;
-                    }
-                }
-
-                match fs::copy(src_path, &dest_path) {
-                    Ok(_) => {
-                        copied.fetch_add(1, Ordering::SeqCst);
-                        if let Some(ref pb) = pb {
-                            pb.inc(1);
-                        } else {
-                            log_output(
-                                &format!("{} {}", msg.copying_file, rel_path.display()),
-                                logger,
-                                quiet,
-                                with_timestamp,
-                            );
-                        }
-                    }
-                    Err(e) if e.kind() == io::ErrorKind::PermissionDenied => {
-                        skipped.fetch_add(1, Ordering::SeqCst);
-                        log_output(
-                            &format!("Permission denied: {}", rel_path.display()),
-                            logger,
-                            quiet,
-                            with_timestamp,
-                        );
-                        if let Some(ref pb) = pb {
-                            pb.inc(1);
-                        }
-                    }
-                    Err(e) => {
-                        skipped.fetch_add(1, Ordering::SeqCst);
-                        log_output(
-                            &format!("Error copying {}: {}", rel_path.display(), e),
-                            logger,
-                            quiet,
-                            with_timestamp,
-                        );
-                        if let Some(ref pb) = pb {
-                            pb.inc(1);
-                        }
-                    }
-                }
-            } else {
-                skipped.fetch_add(1, Ordering::SeqCst);
-                if let Some(ref pb) = pb {
-                    pb.inc(1);
-                }
-            }
-        } else {
-            skipped.fetch_add(1, Ordering::SeqCst);
-            log_output(
-                &format!("Error comparing {}: skipped", rel_path.display()),
-                logger,
-                quiet,
-                with_timestamp,
-            );
-            if let Some(ref pb) = pb {
-                pb.inc(1);
-            }
+        if let Some(parent) = dest_path.parent() {
+            fs::create_dir_all(parent).ok();
         }
-    });
 
-    if let Some(pb) = pb {
-        pb.finish_with_message(msg.backup_done.clone());
-    } else {
-        log_output(&msg.backup_done, logger, quiet, with_timestamp);
+        let status = match is_newer(src_path, &dest_path) {
+            Ok(true) => match fs::copy(src_path, &dest_path) {
+                Ok(_) => {
+                    copied.fetch_add(1, Ordering::SeqCst);
+                    &msg.copied_file
+                }
+                Err(_) => {
+                    skipped.fetch_add(1, Ordering::SeqCst);
+                    &msg.skipped_file
+                }
+            },
+            Ok(false) | Err(_) => {
+                skipped.fetch_add(1, Ordering::SeqCst);
+                &msg.skipped_file
+            }
+        };
+
+        execute!(
+            stdout(),
+            MoveTo(0, progress_row - 3),
+            Clear(ClearType::CurrentLine),
+            Print(format!(
+                "{} {} - {}.",
+                msg.copying_file,
+                src_path.display(),
+                status
+            )),
+            ResetColor
+        )?;
+
+        draw_ui(
+            (copied.load(Ordering::SeqCst) + skipped.load(Ordering::SeqCst)) as f32,
+            progress_row - 1,
+            total_files as f32,
+            msg,
+        );
+
+        sleep(Duration::from_millis(40));
     }
 
     Ok((
         copied.load(Ordering::SeqCst),
         skipped.load(Ordering::SeqCst),
     ))
-}
-
-pub fn test_ui_progress(msg: &Messages) {
-    use crate::ui::{copy_ended, draw_ui};
-    use crossterm::{execute, terminal::EnterAlternateScreen};
-    use std::{io::stdout, thread::sleep, time::Duration};
-
-    // Esempio di "file da copiare"
-    let files = [
-        "/home/user/Documents/report.pdf",
-        "/home/user/Pictures/photo.jpg",
-        "/home/user/Videos/video.mp4",
-        "/home/user/Work/presentation.pptx",
-        "/home/user/Backup/archive.zip",
-    ];
-
-    let total = files.len();
-
-    // Entra in modalità schermo alternativo
-    execute!(stdout(), EnterAlternateScreen).unwrap();
-    let mut row = 0;
-
-    for (i, file) in files.iter().enumerate() {
-        let copied = i + 1;
-
-        draw_ui(file, row, copied as f32, total as f32, msg);
-        row += 1;
-        sleep(Duration::from_millis(700));
-    }
-
-    // Fine
-    copy_ended(row + 3, msg);
 }

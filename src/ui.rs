@@ -1,24 +1,13 @@
-// ======== ui.rs ========
 use crate::utils::Messages;
 use crossterm::{
     cursor::MoveTo,
     execute,
-    style::Print,
+    style::{Print, ResetColor},
     terminal::{Clear, ClearType},
 };
 use std::io::{stdout, Write};
 
-pub fn copy_ended(row: u16, msg: &Messages) {
-    execute!(
-        stdout(),
-        MoveTo(0, row),
-        Clear(ClearType::FromCursorDown),
-        Print(format!("{}\n", msg.backup_done)),
-    )
-    .unwrap();
-}
-
-pub fn draw_ui(file: &str, row: u16, copied: f32, total: f32, msg: &Messages) {
+pub fn draw_ui(copied: f32, progress_row: u16, total: f32, msg: &Messages) {
     let progress = copied / total;
     let percent = (progress * 100.0).round();
 
@@ -27,20 +16,17 @@ pub fn draw_ui(file: &str, row: u16, copied: f32, total: f32, msg: &Messages) {
     let empty = bar_width - filled;
 
     let bar = format!("[{}{}]", "█".repeat(filled), "░".repeat(empty));
-
-    let final_mex = format!(
-        "{} {} {}/{} ({:.0}%) {}",
-        msg.copy_progress, msg.file, copied, total, percent, bar
+    let progress_line = format!(
+        "{}: file {}/{} ({:.0}%) {}",
+        msg.copy_progress, copied as usize, total as usize, percent, bar
     );
 
-    // Pulisci e stampa su 3 righe
     execute!(
         stdout(),
-        MoveTo(0, row),
-        Clear(ClearType::FromCursorDown),
-        Print(format!("{} {}", msg.copying_file, file)),
-        MoveTo(0, row + 2),
-        Print(final_mex),
+        MoveTo(0, progress_row),
+        Clear(ClearType::CurrentLine),
+        Print(progress_line),
+        ResetColor
     )
     .unwrap();
 
