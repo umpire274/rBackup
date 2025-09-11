@@ -5,7 +5,7 @@
 ![CI](https://github.com/umpire274/rbackup/actions/workflows/ci.yml/badge.svg)
 [![Licenza MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS%20Intel%20%7C%20macOS%20Apple%20Silicon-blue)](https://github.com/umpire274/rBackup/releases)
-[![Versione](https://img.shields.io/badge/version-0.2.7-orange)](https://github.com/umpire274/rbackup/releases/tag/v0.2.7)
+[![Versione](https://img.shields.io/badge/version-0.3.0-orange)](https://github.com/umpire274/rbackup/releases/tag/v0.3.0)
 
 📋 [View recent changes (Changelog)](CHANGELOG.md)
 
@@ -18,7 +18,7 @@
 - 🌍 **Multilingual support** – English and Italian (with auto-detection)
 - 📦 **Portable** – no installation required, single binary
 - 🧾 **Optional logging** – write backup reports to a file
-- 📊 **Progress bar** – optionally display graphical progress bar
+- 📊 **Progress bar** – display graphical progress bar during copy process
 - 🤫 **Quiet mode** – suppress all output for silent operation
 
 ---
@@ -103,12 +103,10 @@ rbackup ~/Documents /mnt/backup_drive/Documents
 
 | Option                | Description                      |
 | --------------------- | -------------------------------- |
-| `-g`, `--graph`       | Show graphical progress bar      |
 | `-q`, `--quiet`       | Suppress console output          |
 | `-t`, `--timestamp`   | Prepend timestamp to messages    |
 | `--log <FILE>`        | Write output to a log file       |
 | `-l`, `--lang <code>` | Force language (e.g. `en`, `it`) |
-| `-T`, `--test_ui`     | Run graphical progress bar test  |
 | `-V`, `--version`     | Show version                     |
 | `-h`, `--help`        | Show help message                |
 
@@ -119,7 +117,7 @@ rbackup ~/Documents /mnt/backup_drive/Documents
 ## 📝 Example
 
 ```sh
-rbackup /home/alex/Projects /mnt/usb-backup -g --log backup.log --timestamp
+rbackup /home/alex/Projects /mnt/usb-backup --log backup.log --timestamp
 ```
 
 ## 🧪 Build from source

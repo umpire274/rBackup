@@ -6,6 +6,46 @@ All notable changes to the `rbackup` project will be documented in this file.
 
 ---
 
+## [v0.3.0] - 2025-09-10
+
+### 🚀 Features
+
+- Added absolute path to name of copying file
+- Added message `Skipped.` or `Copied.` at the end of each file name
+
+### 🐛 Bug Fixes
+
+- Fixed bug that prevented skipping of already existing files in destination directory
+- Fixed the process of copy/skip file graphically
+
+### 🔧 Code Cleanup
+
+- Deleted parameter `-g` (no longer necessary)
+
+### 📦 Miscellaneous
+
+- Modified format of starting and ending backup messages
+- Commented out unused functions
+
+---
+
+## [0.2.8] – 2025-07-23
+
+### ✅ Fixed
+
+- **Fixes Issue #1**: ["This program must be run as administrator"](https://github.com/umpire274/rBackup/issues/1) – now
+  the application runs on **Windows** without requiring elevated privileges.
+- **Code cleanup**: removed Windows-specific elevation code (`elevator.rs` was removed).
+- **CI fixes**: corrected GitHub Actions workflow for all platforms.
+- **Macro derive fix**: added missing `use clap::Parser;` and corrected all `#[arg(...)]` and `#[command(...)]`
+  attributes.
+
+### Notes
+
+- No functional changes for macOS and Linux users.
+- Verified correct CLI behavior with combined `--graph`, `--log`, and `--timestamp` options.
+
+---
 ## [0.2.7] – 2025-06-26
 
 ### ✨ Changed
