@@ -30,10 +30,6 @@ struct Args {
     #[arg(short, long, default_value = "auto")]
     lang: String,
 
-    /// Show graphical progress bar instead of filenames
-    #[arg(short = 'g', long = "graph")]
-    show_graph: bool,
-
     /// Quiet mode: suppress console output
     #[arg(short = 'q', long = "quiet")]
     quiet: bool,
@@ -78,7 +74,7 @@ fn main() -> io::Result<()> {
     };
 
     // Mostra help o version senza elevazione
-    if (args.show_graph || args.quiet || args.log_file.is_none())
+    if (args.quiet || args.log_file.is_none())
         && (args.source.is_none() || args.destination.is_none())
     {
         eprintln!("Error: missing source or destination directory.\n");
