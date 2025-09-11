@@ -12,14 +12,13 @@ categories = ["command-line-utilities", "filesystem"]
 exclude = ["/dist/*", "/temp_build/*"]
 
 [dependencies]
-clap = { version = "4.5.41", features = ["derive"] }
+clap = { version = "4.5.47", features = ["derive"] }
 crossterm = "0.29.0"
 walkdir = "2.5.0"
 serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.141"
-chrono = "0.4.41"
+serde_json = "1.0.143"
+chrono = "0.4.42"
 sys-locale = "0.3.2"
-terminal_size = "0.4.2"
 
 # Windows-specific APIs via `windows` crate
 [target.'cfg(windows)'.dependencies.windows]

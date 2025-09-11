@@ -1,8 +1,13 @@
 use crate::ui::draw_ui;
 use chrono::Local;
+use crossterm::cursor::MoveTo;
+use crossterm::execute;
+use crossterm::style::{Print, ResetColor};
+use crossterm::terminal::{Clear, ClearType};
 use serde::Deserialize;
-use std::collections::HashMap;
+use std::io::stdout;
 use std::{
+    collections::HashMap,
     fs::{self, File},
     io::{self, Write},
     path::Path,
@@ -13,7 +18,6 @@ use std::{
     thread::sleep,
     time::Duration,
 };
-use terminal_size::{terminal_size, Height};
 use walkdir::WalkDir;
 
 #[derive(Deserialize)]
@@ -61,8 +65,8 @@ fn is_newer(src: &Path, dest: &Path) -> io::Result<bool> {
     if !dest.exists() {
         return Ok(true);
     }
-    let src_meta = fs::metadata(src)?;
-    let dest_meta = fs::metadata(dest)?;
+    let src_meta = src.metadata()?;
+    let dest_meta = dest.metadata()?;
     Ok(src_meta.modified()? > dest_meta.modified()?)
 }
 
@@ -80,6 +84,7 @@ pub fn copy_incremental(
     _logger: &Logger,
     _quiet: bool,
     _with_timestamp: bool,
+    progress_row: u16,
 ) -> io::Result<(usize, usize)> {
     let entries: Vec<_> = WalkDir::new(src_dir)
         .into_iter()
@@ -91,19 +96,11 @@ pub fn copy_incremental(
     let skipped = AtomicUsize::new(0);
     let total_files = entries.len();
 
-    let term_height = match terminal_size() {
-        Some((_, Height(h))) => h,
-        _ => 25,
-    };
-
-    let log_row = term_height.saturating_sub(3);
-    let mut row = 0;
-
-    entries.iter().enumerate().for_each(|(_i, entry)| {
+    for entry in entries {
         let src_path = entry.path();
         let rel_path = match src_path.strip_prefix(src_dir) {
             Ok(p) => p,
-            Err(_) => return,
+            Err(_) => continue,
         };
         let dest_path = dest_dir.join(rel_path);
 
@@ -111,8 +108,8 @@ pub fn copy_incremental(
             fs::create_dir_all(parent).ok();
         }
 
-        let status = if let Ok(true) = is_newer(src_path, &dest_path) {
-            match fs::copy(src_path, &dest_path) {
+        let status = match is_newer(src_path, &dest_path) {
+            Ok(true) => match fs::copy(src_path, &dest_path) {
                 Ok(_) => {
                     copied.fetch_add(1, Ordering::SeqCst);
                     &msg.copied_file
@@ -121,29 +118,38 @@ pub fn copy_incremental(
                     skipped.fetch_add(1, Ordering::SeqCst);
                     &msg.skipped_file
                 }
+            },
+            Ok(false) | Err(_) => {
+                skipped.fetch_add(1, Ordering::SeqCst);
+                &msg.skipped_file
             }
-        } else {
-            skipped.fetch_add(1, Ordering::SeqCst);
-            &msg.skipped_file
         };
 
+        execute!(
+            stdout(),
+            MoveTo(0, progress_row - 3),
+            Clear(ClearType::CurrentLine),
+            Print(format!(
+                "{} {} - {}.",
+                msg.copying_file,
+                src_path.display(),
+                status
+            )),
+            ResetColor
+        )?;
+
         draw_ui(
-            &format!("{} - {}", src_path.display(), status),
             (copied.load(Ordering::SeqCst) + skipped.load(Ordering::SeqCst)) as f32,
+            progress_row - 1,
             total_files as f32,
             msg,
         );
 
-        if row < log_row {
-            row += 1;
-        }
-
         sleep(Duration::from_millis(40));
-    });
+    }
 
     Ok((
         copied.load(Ordering::SeqCst),
         skipped.load(Ordering::SeqCst),
     ))
 }
-
