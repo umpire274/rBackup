@@ -48,7 +48,7 @@ pub fn log_output(msg: &str, logger: &Logger, quiet: bool, with_timestamp: bool)
     let full_msg = if with_timestamp {
         format!("\n\n[{}] {}", now(), msg)
     } else {
-        format!("{}", msg.to_string())
+        msg.to_string()
     };
 
     if !quiet {
