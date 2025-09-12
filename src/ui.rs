@@ -17,7 +17,7 @@ pub fn draw_ui(copied: f32, progress_row: u16, total: f32, msg: &Messages) {
 
     let bar = format!("[{}{}]", "█".repeat(filled), "░".repeat(empty));
     let progress_line = format!(
-        "{}: file {}/{} ({:.0}%) {}",
+        "{} file {}/{} ({:.0}%) {}",
         msg.copy_progress, copied as usize, total as usize, percent, bar
     );
 
