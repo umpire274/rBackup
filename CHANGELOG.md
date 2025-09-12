@@ -10,7 +10,8 @@ All notable changes to the `rbackup` project will be documented in this file.
 
 ### 🚀 Improvements
 
-- Cleaning the screen in case the copy message took more then one row in output
+- Cleaning the screen in case the copy message took more than one row in output
+- Changed the output message when copying to correct punctuation 
 
 ### 🔧 Code Cleanup
 
