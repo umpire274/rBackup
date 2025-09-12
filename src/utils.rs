@@ -15,8 +15,6 @@ use std::{
         atomic::{AtomicUsize, Ordering},
         Arc, Mutex,
     },
-    thread::sleep,
-    time::Duration,
 };
 use walkdir::WalkDir;
 
@@ -127,6 +125,13 @@ pub fn copy_incremental(
 
         execute!(
             stdout(),
+            MoveTo(0, progress_row - 2),
+            Clear(ClearType::CurrentLine),
+            ResetColor
+        )?;
+
+        execute!(
+            stdout(),
             MoveTo(0, progress_row - 3),
             Clear(ClearType::CurrentLine),
             Print(format!(
@@ -144,8 +149,6 @@ pub fn copy_incremental(
             total_files as f32,
             msg,
         );
-
-        sleep(Duration::from_millis(40));
     }
 
     Ok((
