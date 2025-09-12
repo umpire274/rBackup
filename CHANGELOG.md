@@ -6,6 +6,20 @@ All notable changes to the `rbackup` project will be documented in this file.
 
 ---
 
+## [v0.3.1] - 2025-09-12
+
+### 🚀 Improvements
+
+- Cleaning the screen in case the copy message took more than one row in output
+- Changed the output message when copying to correct punctuation 
+
+### 🔧 Code Cleanup
+
+- Deleted delay between one copy and the next one
+- Deleted unused create imports
+
+---
+
 ## [v0.3.0] - 2025-09-10
 
 ### 🚀 Features
