@@ -1,0 +1,28 @@
+name: Rust Build & Test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  check:
+    name: Lint & Test
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+      
+      - name: Format Check
+        run: cargo fmt --all -- --check
+      
+      - name: Clippy Check
+        run: cargo clippy --all-targets --all-features -- -D warnings
+      
+      - name: Run Tests
+        run: cargo test --all
