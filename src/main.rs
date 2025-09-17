@@ -9,7 +9,7 @@ use std::io;
 use std::io::stdout;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use utils::{copy_incremental, load_translations, log_output, Logger};
+use utils::{Logger, copy_incremental, load_translations, log_output};
 
 #[derive(Parser, Debug)]
 #[command(

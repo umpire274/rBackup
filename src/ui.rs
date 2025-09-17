@@ -5,7 +5,7 @@ use crossterm::{
     style::{Print, ResetColor},
     terminal::{Clear, ClearType},
 };
-use std::io::{stdout, Write};
+use std::io::{Write, stdout};
 
 pub fn draw_ui(copied: f32, progress_row: u16, total: f32, msg: &Messages) {
     let progress = copied / total;

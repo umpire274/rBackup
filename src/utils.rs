@@ -12,8 +12,8 @@ use std::{
     io::{self, Write},
     path::Path,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
     },
 };
 use walkdir::WalkDir;
