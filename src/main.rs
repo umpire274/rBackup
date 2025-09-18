@@ -114,11 +114,12 @@ fn main() -> io::Result<()> {
         &logger,
         args.quiet,
         args.timestamp,
+        false,
     );
 
     log_output(
         &format!(
-            "{} {} {} {}\n\n\n\n",
+            "{} {} {} {}\n\n\n\n\n",
             msg.starting_backup,
             source.display(),
             msg.to,
@@ -127,6 +128,7 @@ fn main() -> io::Result<()> {
         &logger,
         args.quiet,
         args.timestamp,
+        false,
     );
 
     let (_cols, rows) = terminal::size().unwrap_or((80, 24));
@@ -143,22 +145,25 @@ fn main() -> io::Result<()> {
     )?;
 
     log_output(
-        format!("\n\n{}", msg.backup_ended.as_str()).as_str(),
+        format!("\n\n\n{}", msg.backup_ended.as_str()).as_str(),
         &logger,
         args.quiet,
         args.timestamp,
+        false,
     );
     log_output(
         &msg.files_copied.replace("{}", &copied.to_string()),
         &logger,
         args.quiet,
         args.timestamp,
+        false,
     );
     log_output(
         &msg.files_skipped.replace("{}", &skipped.to_string()),
         &logger,
         args.quiet,
         args.timestamp,
+        false,
     );
 
     Ok(())

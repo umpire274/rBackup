@@ -42,14 +42,14 @@ pub fn now() -> String {
     Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
 }
 
-pub fn log_output(msg: &str, logger: &Logger, quiet: bool, with_timestamp: bool) {
+pub fn log_output(msg: &str, logger: &Logger, quiet: bool, with_timestamp: bool, file: bool) {
     let full_msg = if with_timestamp {
-        format!("\n\n[{}] {}", now(), msg)
+        format!("[{}] {}", now(), msg)
     } else {
         msg.to_string()
     };
 
-    if !quiet {
+    if !quiet && !file {
         println!("{full_msg}");
     }
 
@@ -79,9 +79,9 @@ pub fn copy_incremental(
     src_dir: &Path,
     dest_dir: &Path,
     msg: &Messages,
-    _logger: &Logger,
-    _quiet: bool,
-    _with_timestamp: bool,
+    logger: &Logger,
+    quiet: bool,
+    with_timestamp: bool,
     progress_row: u16,
 ) -> io::Result<(usize, usize)> {
     let entries: Vec<_> = WalkDir::new(src_dir)
@@ -130,18 +130,18 @@ pub fn copy_incremental(
             ResetColor
         )?;
 
+        let log_line = format!("{} {} - {}.", msg.copying_file, src_path.display(), status);
+
         execute!(
             stdout(),
             MoveTo(0, progress_row - 3),
             Clear(ClearType::CurrentLine),
-            Print(format!(
-                "{} {} - {}.",
-                msg.copying_file,
-                src_path.display(),
-                status
-            )),
+            Print(&log_line),
             ResetColor
         )?;
+
+        // print the copy message on the log file if requested
+        log_output(&log_line, logger, quiet, with_timestamp, true);
 
         draw_ui(
             (copied.load(Ordering::SeqCst) + skipped.load(Ordering::SeqCst)) as f32,
