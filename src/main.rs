@@ -1,15 +1,18 @@
+mod output;
 mod ui;
 mod utils;
 
+use crate::output::print_message;
 use clap::{CommandFactory, Parser};
 use crossterm::terminal::{Clear, ClearType};
 use crossterm::{execute, terminal};
 use std::fs::File;
 use std::io;
+use std::io::BufWriter;
 use std::io::stdout;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use utils::{Logger, copy_incremental, load_translations, log_output};
+use utils::{copy_incremental, load_translations};
 
 #[derive(Parser, Debug)]
 #[command(
@@ -83,17 +86,10 @@ fn main() -> io::Result<()> {
         std::process::exit(1);
     }
 
-    let logger: Logger = if let Some(ref path) = args.log_file {
-        match File::create(path) {
-            Ok(file) => Some(Arc::new(Mutex::new(file))),
-            Err(e) => {
-                eprintln!("Failed to create log file: {e}");
-                std::process::exit(1);
-            }
-        }
-    } else {
-        None
-    };
+    let logger = args.log_file.as_ref().map(|path| {
+        let file = File::create(path).expect("Unable to create log file");
+        Arc::new(Mutex::new(BufWriter::new(file)))
+    });
 
     let source = args.source.as_ref().unwrap();
     let destination = args.destination.as_ref().unwrap();
@@ -109,15 +105,14 @@ fn main() -> io::Result<()> {
 
     clear_terminal();
 
-    log_output(
-        msg.backup_init.as_str(),
-        &logger,
+    print_message(
+        &msg.backup_init,
+        &logger.as_ref(),
         args.quiet,
         args.timestamp,
-        false,
+        None,
     );
-
-    log_output(
+    print_message(
         &format!(
             "{} {} {} {}\n\n\n\n\n",
             msg.starting_backup,
@@ -125,46 +120,45 @@ fn main() -> io::Result<()> {
             msg.to,
             destination.display()
         ),
-        &logger,
+        &logger.as_ref(),
         args.quiet,
         args.timestamp,
-        false,
+        None,
     );
 
     let (_cols, rows) = terminal::size().unwrap_or((80, 24));
     let progress_row = rows.saturating_sub(1);
 
-    let (copied, skipped) = copy_incremental(
+    match copy_incremental(
         source,
         destination,
         msg,
-        &logger,
+        &logger.as_ref(),
         args.quiet,
         args.timestamp,
         progress_row,
-    )?;
-
-    log_output(
-        format!("\n\n\n{}", msg.backup_ended.as_str()).as_str(),
-        &logger,
-        args.quiet,
-        args.timestamp,
-        false,
-    );
-    log_output(
-        &msg.files_copied.replace("{}", &copied.to_string()),
-        &logger,
-        args.quiet,
-        args.timestamp,
-        false,
-    );
-    log_output(
-        &msg.files_skipped.replace("{}", &skipped.to_string()),
-        &logger,
-        args.quiet,
-        args.timestamp,
-        false,
-    );
+    ) {
+        Ok((copied, skipped)) => {
+            let done_msg = format!(
+                "\n\n\n{} ({}, {})",
+                msg.backup_ended,
+                &msg.files_copied.replace("{}", &copied.to_string()),
+                &msg.files_skipped.replace("{}", &skipped.to_string())
+            );
+            print_message(
+                &done_msg,
+                &logger.as_ref(),
+                args.quiet,
+                args.timestamp,
+                None,
+            );
+        }
+        Err(e) => {
+            let error_msg = format!("{}: {}", msg.generic_error, e);
+            print_message(&error_msg, &logger.as_ref(), false, args.timestamp, None);
+            std::process::exit(1);
+        }
+    }
 
     Ok(())
 }

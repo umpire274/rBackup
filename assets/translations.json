@@ -13,7 +13,8 @@
 	"files_skipped": "Files skipped or failed: {}",
 	"copy_progress": "Copy progress:",
 	"copied_file": "Copied.",
-	"skipped_file": "Skipped."
+	"skipped_file": "Skipped.",
+	"generic_error": "Error during copy"
   },
   "it": {
 	"appname": "rBackup",
@@ -29,6 +30,7 @@
 	"files_skipped": "File saltati o falliti: {}",
 	"copy_progress": "Avanzamento copia:",
 	"copied_file": "Copiato.",
-	"skipped_file": "Saltato."
+	"skipped_file": "Saltato.",
+	"generic_error": "Errore durante la copia"
   }
 }

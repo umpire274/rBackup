@@ -1,15 +1,11 @@
+use crate::output::print_message;
 use crate::ui::draw_ui;
-use chrono::Local;
-use crossterm::cursor::MoveTo;
-use crossterm::execute;
-use crossterm::style::{Print, ResetColor};
-use crossterm::terminal::{Clear, ClearType};
 use serde::Deserialize;
-use std::io::stdout;
+use std::io::BufWriter;
 use std::{
     collections::HashMap,
     fs::{self, File},
-    io::{self, Write},
+    io::{self},
     path::Path,
     sync::{
         Arc, Mutex,
@@ -33,40 +29,10 @@ pub struct Messages {
     pub copy_progress: String,
     pub copied_file: String,
     pub skipped_file: String,
+    pub generic_error: String,
 }
 
 pub type Translations = HashMap<String, Messages>;
-pub type Logger = Option<Arc<Mutex<File>>>;
-
-pub fn now() -> String {
-    Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
-}
-
-pub fn log_output(msg: &str, logger: &Logger, quiet: bool, with_timestamp: bool, file: bool) {
-    let full_msg = if with_timestamp {
-        format!("[{}] {}", now(), msg)
-    } else {
-        msg.to_string()
-    };
-
-    if !quiet && !file {
-        println!("{full_msg}");
-    }
-
-    if let Some(file) = logger {
-        let mut file = file.lock().unwrap();
-        writeln!(file, "{full_msg}").ok();
-    }
-}
-
-fn is_newer(src: &Path, dest: &Path) -> io::Result<bool> {
-    if !dest.exists() {
-        return Ok(true);
-    }
-    let src_meta = src.metadata()?;
-    let dest_meta = dest.metadata()?;
-    Ok(src_meta.modified()? > dest_meta.modified()?)
-}
 
 pub fn load_translations() -> io::Result<Translations> {
     let data = include_str!("../assets/translations.json");
@@ -75,11 +41,23 @@ pub fn load_translations() -> io::Result<Translations> {
     Ok(translations)
 }
 
+fn is_newer(src: &Path, dest: &Path) -> io::Result<bool> {
+    match (fs::metadata(src), fs::metadata(dest)) {
+        (Ok(src_meta), Ok(dest_meta)) => {
+            let src_time = src_meta.modified()?;
+            let dest_time = dest_meta.modified()?;
+            Ok(src_time > dest_time)
+        }
+        (Ok(_), Err(_)) => Ok(true),
+        _ => Ok(false),
+    }
+}
+
 pub fn copy_incremental(
     src_dir: &Path,
     dest_dir: &Path,
     msg: &Messages,
-    logger: &Logger,
+    logger: &Option<&Arc<Mutex<BufWriter<File>>>>,
     quiet: bool,
     with_timestamp: bool,
     progress_row: u16,
@@ -123,25 +101,21 @@ pub fn copy_incremental(
             }
         };
 
-        execute!(
-            stdout(),
-            MoveTo(0, progress_row - 2),
-            Clear(ClearType::CurrentLine),
-            ResetColor
-        )?;
-
+        print_message(
+            "",
+            logger,
+            quiet,
+            with_timestamp,
+            Option::from(progress_row - 2),
+        );
         let log_line = format!("{} {} - {}.", msg.copying_file, src_path.display(), status);
-
-        execute!(
-            stdout(),
-            MoveTo(0, progress_row - 3),
-            Clear(ClearType::CurrentLine),
-            Print(&log_line),
-            ResetColor
-        )?;
-
-        // print the copy message on the log file if requested
-        log_output(&log_line, logger, quiet, with_timestamp, true);
+        print_message(
+            &log_line,
+            logger,
+            quiet,
+            with_timestamp,
+            Option::from(progress_row - 3),
+        );
 
         draw_ui(
             (copied.load(Ordering::SeqCst) + skipped.load(Ordering::SeqCst)) as f32,
