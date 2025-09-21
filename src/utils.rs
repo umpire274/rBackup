@@ -107,14 +107,22 @@ pub fn copy_incremental(
             quiet,
             with_timestamp,
             Option::from(progress_row - 2),
+            false,
         );
-        let log_line = format!("{} {} - {}.", msg.copying_file, src_path.display(), status);
+        let log_line = format!(
+            "#{} {} {} - {}.",
+            (copied.load(Ordering::SeqCst) + skipped.load(Ordering::SeqCst)) as f32,
+            msg.copying_file,
+            src_path.display(),
+            status
+        );
         print_message(
             &log_line,
             logger,
             quiet,
             with_timestamp,
             Option::from(progress_row - 3),
+            true,
         );
 
         draw_ui(

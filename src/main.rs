@@ -111,6 +111,7 @@ fn main() -> io::Result<()> {
         args.quiet,
         args.timestamp,
         None,
+        true,
     );
     print_message(
         &format!(
@@ -124,6 +125,7 @@ fn main() -> io::Result<()> {
         args.quiet,
         args.timestamp,
         None,
+        true,
     );
 
     let (_cols, rows) = terminal::size().unwrap_or((80, 24));
@@ -151,11 +153,19 @@ fn main() -> io::Result<()> {
                 args.quiet,
                 args.timestamp,
                 None,
+                true,
             );
         }
         Err(e) => {
             let error_msg = format!("{}: {}", msg.generic_error, e);
-            print_message(&error_msg, &logger.as_ref(), false, args.timestamp, None);
+            print_message(
+                &error_msg,
+                &logger.as_ref(),
+                false,
+                args.timestamp,
+                None,
+                true,
+            );
             std::process::exit(1);
         }
     }
