@@ -1,7 +1,10 @@
-use crate::output::print_message;
+use crate::output::log_output;
 use crate::ui::draw_ui;
+use crossterm::execute;
+use crossterm::terminal::{Clear, ClearType};
+use globset::{Glob, GlobSet, GlobSetBuilder};
 use serde::Deserialize;
-use std::io::BufWriter;
+use std::io::{BufWriter, stdout};
 use std::{
     collections::HashMap,
     fs::{self, File},
@@ -16,13 +19,15 @@ use walkdir::WalkDir;
 
 #[derive(Deserialize)]
 pub struct Messages {
+    pub cur_conf: String,
+    pub conf_file_not_found: String,
+    pub conf_initialized: String,
     pub backup_init: String,
     pub backup_ended: String,
     pub starting_backup: String,
     pub to: String,
     pub copying_file: String,
-    //    pub backup_done: String,
-    pub invalid_source: String,
+    //    pub invalid_source: String,
     pub language_not_supported: String,
     pub files_copied: String,
     pub files_skipped: String,
@@ -30,6 +35,20 @@ pub struct Messages {
     pub copied_file: String,
     pub skipped_file: String,
     pub generic_error: String,
+    pub error_exclude_parsing: String,
+}
+
+pub fn clear_terminal() {
+    execute!(stdout(), Clear(ClearType::All)).unwrap();
+}
+
+/// Raggruppa le opzioni di copia.
+pub struct CopyOptions<'a> {
+    pub logger: &'a Option<Arc<Mutex<BufWriter<File>>>>,
+    pub quiet: bool,
+    pub timestamp: bool,
+    pub exclude_matcher: Option<GlobSet>,
+    pub progress_row: u16,
 }
 
 pub type Translations = HashMap<String, Messages>;
@@ -57,10 +76,7 @@ pub fn copy_incremental(
     src_dir: &Path,
     dest_dir: &Path,
     msg: &Messages,
-    logger: &Option<&Arc<Mutex<BufWriter<File>>>>,
-    quiet: bool,
-    with_timestamp: bool,
-    progress_row: u16,
+    options: &CopyOptions,
 ) -> io::Result<(usize, usize)> {
     let entries: Vec<_> = WalkDir::new(src_dir)
         .into_iter()
@@ -74,6 +90,12 @@ pub fn copy_incremental(
 
     for entry in entries {
         let src_path = entry.path();
+        if let Some(ex) = &options.exclude_matcher
+            && ex.is_match(src_path)
+        {
+            skipped.fetch_add(1, Ordering::SeqCst);
+            continue;
+        }
         let rel_path = match src_path.strip_prefix(src_dir) {
             Ok(p) => p,
             Err(_) => continue,
@@ -101,12 +123,12 @@ pub fn copy_incremental(
             }
         };
 
-        print_message(
+        log_output(
             "",
-            logger,
-            quiet,
-            with_timestamp,
-            Option::from(progress_row - 2),
+            options.logger,
+            options.quiet,
+            options.timestamp,
+            Option::from(options.progress_row - 2),
             false,
         );
         let log_line = format!(
@@ -116,18 +138,18 @@ pub fn copy_incremental(
             src_path.display(),
             status
         );
-        print_message(
+        log_output(
             &log_line,
-            logger,
-            quiet,
-            with_timestamp,
-            Option::from(progress_row - 3),
+            options.logger,
+            options.quiet,
+            options.timestamp,
+            Option::from(options.progress_row - 3),
             true,
         );
 
         draw_ui(
             (copied.load(Ordering::SeqCst) + skipped.load(Ordering::SeqCst)) as f32,
-            progress_row - 1,
+            options.progress_row - 1,
             total_files as f32,
             msg,
         );
@@ -137,4 +159,15 @@ pub fn copy_incremental(
         copied.load(Ordering::SeqCst),
         skipped.load(Ordering::SeqCst),
     ))
+}
+
+pub fn build_exclude_matcher(patterns: &[String]) -> io::Result<GlobSet> {
+    let mut builder = GlobSetBuilder::new();
+    for pattern in patterns {
+        builder
+            .add(Glob::new(pattern).map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))?);
+    }
+    builder
+        .build()
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, e))
 }

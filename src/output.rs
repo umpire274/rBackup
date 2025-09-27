@@ -1,3 +1,4 @@
+use crate::config::Config;
 use crossterm::{
     QueueableCommand,
     cursor::MoveTo,
@@ -9,12 +10,15 @@ use std::io::{BufWriter, Write, stdout};
 use std::sync::{Arc, Mutex};
 
 pub fn now() -> String {
-    chrono::Local::now().format("%Y-%m-%d %H:%M:%S").to_string()
+    let custom_format = Config::load().unwrap().timestamp_format;
+    chrono::Local::now()
+        .format(custom_format.as_str())
+        .to_string()
 }
 
-pub fn print_message(
+pub fn log_output(
     msg: &str,
-    logger: &Option<&Arc<Mutex<BufWriter<File>>>>,
+    logger: &Option<Arc<Mutex<BufWriter<File>>>>,
     quiet: bool,
     with_timestamp: bool,
     row: Option<u16>,
@@ -34,13 +38,11 @@ pub fn print_message(
             .and_then(|s| s.queue(Print(&full_msg)))
             .and_then(|s| s.flush());
     } else if !quiet {
-        println!("{full_msg}");
+        println!("{}", full_msg);
     }
 
-    if on_log {
-        if let Some(file) = logger {
-            let mut file = file.lock().unwrap();
-            let _ = writeln!(file, "{full_msg}");
-        }
+    if on_log && let Some(file) = logger {
+        let mut file = file.lock().unwrap();
+        let _ = writeln!(file, "{}", full_msg);
     }
 }

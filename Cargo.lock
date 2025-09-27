@@ -463,6 +463,7 @@ dependencies = [
  "clap",
  "crossterm",
     "globset",
+    "log",
  "serde",
  "serde_json",
     "serde_yaml",

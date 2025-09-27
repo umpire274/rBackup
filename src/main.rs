@@ -1,67 +1,93 @@
+mod commands;
+mod config;
+mod copy;
 mod output;
 mod ui;
 mod utils;
 
-use crate::output::print_message;
-use clap::{CommandFactory, Parser};
-use crossterm::terminal::{Clear, ClearType};
-use crossterm::{execute, terminal};
-use std::fs::File;
-use std::io;
-use std::io::BufWriter;
-use std::io::stdout;
+use crate::config::Config;
+use crate::utils::load_translations;
+use clap::{ArgAction, Parser, Subcommand};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
-use utils::{copy_incremental, load_translations};
 
-#[derive(Parser, Debug)]
+#[derive(Debug, Parser)]
 #[command(
+    name = "rbackup",
     author = "Alessandro Maestri",
     version,
     about = "rBackup - New incremental directory backup",
-    long_about = "rbackup: a Rust-based backup tool that copies only new or modified files from a source to a destination directory. Supports multithreading, language localization, logging, and progress display.",
-    arg_required_else_help = true
+    long_about = "rbackup: a Rust-based backup tool that copies only new or modified files from a source to a destination directory. Supports multithreading, language localization, logging, and progress display."
 )]
-struct Args {
-    /// Source directory
-    source: Option<PathBuf>,
-
-    /// Destination directory
-    destination: Option<PathBuf>,
-
-    /// Language code: en or it (default: en)
-    #[arg(short, long, default_value = "auto")]
-    lang: String,
-
-    /// Quiet mode: suppress console output
-    #[arg(short = 'q', long = "quiet")]
-    quiet: bool,
-
-    /// Write output to a log file
-    #[arg(long = "log", value_name = "FILE")]
-    log_file: Option<PathBuf>,
-
-    /// Add timestamp to log and console output
-    #[arg(short = 't', long = "timestamp")]
-    timestamp: bool,
+struct Cli {
+    #[command(subcommand)]
+    command: Commands,
 }
 
-fn clear_terminal() {
-    execute!(stdout(), Clear(ClearType::All)).unwrap();
+#[derive(Debug, Subcommand)]
+enum Commands {
+    /// Perform an incremental backup
+    Copy {
+        /// Source directory to backup
+        source: PathBuf,
+
+        /// Destination directory
+        destination: PathBuf,
+
+        /// Suppress all output to stdout
+        #[arg(short, long, action = ArgAction::SetTrue)]
+        quiet: bool,
+
+        /// Print timestamps in logs
+        #[arg(short, long, action = ArgAction::SetTrue)]
+        timestamp: bool,
+
+        /// File path to write logs
+        #[arg(long, value_name = "FILE")]
+        log: Option<PathBuf>,
+
+        /// Exclude files matching the given glob pattern (can be used multiple times)
+        #[arg(short = 'x', long = "exclude", value_name = "PATTERN", action = ArgAction::Append)]
+        exclude: Vec<String>,
+    },
+
+    /// Manage the configuration file (view or edit)
+    Config {
+        /// Initialize a default config file
+        #[arg(long = "init", help = "Initiate a default config file")]
+        init_config: bool,
+
+        /// Print the current configuration file to stdout
+        #[arg(long = "print", help = "Print the current configuration file")]
+        print_config: bool,
+
+        /// Edit the configuration file with your preferred editor
+        #[arg(
+            long = "edit",
+            help = "Edit the configuration file (default editor: $EDITOR, or nano/vim/notepad)"
+        )]
+        edit_config: bool,
+
+        /// Specify the editor to use (overrides $EDITOR/$VISUAL).
+        /// Common choices: vim, nano.
+        #[arg(
+            long = "editor",
+            help = "Specify the editor to use (vim, nano, or custom path)"
+        )]
+        editor: Option<String>,
+    },
 }
 
-fn main() -> io::Result<()> {
-    let args = Args::parse();
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let cli = Cli::parse();
 
     let translations = load_translations()?;
-    let lang_code = if args.lang == "auto" {
+    let lang_code = if Config::load().unwrap().language == "auto" {
         sys_locale::get_locale()
             .and_then(|val| val.split(&['_', '-']).next().map(str::to_lowercase))
             .unwrap_or_else(|| "en".to_string())
     } else {
-        args.lang.to_lowercase()
+        Config::load().unwrap().language.to_lowercase()
     };
-
     let msg = match translations.get(&lang_code) {
         Some(messages) => messages,
         None => {
@@ -76,99 +102,8 @@ fn main() -> io::Result<()> {
         }
     };
 
-    // Mostra help o version senza elevazione
-    if (args.quiet || args.log_file.is_none())
-        && (args.source.is_none() || args.destination.is_none())
-    {
-        eprintln!("Error: missing source or destination directory.\n");
-        Args::command().print_help()?;
-        println!();
-        std::process::exit(1);
+    match &cli.command {
+        Commands::Config { .. } => commands::handle_conf(&cli.command, msg),
+        Commands::Copy { .. } => commands::handle_copy(&cli.command, msg),
     }
-
-    let logger = args.log_file.as_ref().map(|path| {
-        let file = File::create(path).expect("Unable to create log file");
-        Arc::new(Mutex::new(BufWriter::new(file)))
-    });
-
-    let source = args.source.as_ref().unwrap();
-    let destination = args.destination.as_ref().unwrap();
-
-    if !source.is_dir() {
-        eprintln!("{}", msg.invalid_source);
-        std::process::exit(1);
-    }
-
-    if !destination.exists() {
-        std::fs::create_dir_all(destination)?;
-    }
-
-    clear_terminal();
-
-    print_message(
-        &msg.backup_init,
-        &logger.as_ref(),
-        args.quiet,
-        args.timestamp,
-        None,
-        true,
-    );
-    print_message(
-        &format!(
-            "{} {} {} {}\n\n\n\n\n",
-            msg.starting_backup,
-            source.display(),
-            msg.to,
-            destination.display()
-        ),
-        &logger.as_ref(),
-        args.quiet,
-        args.timestamp,
-        None,
-        true,
-    );
-
-    let (_cols, rows) = terminal::size().unwrap_or((80, 24));
-    let progress_row = rows.saturating_sub(1);
-
-    match copy_incremental(
-        source,
-        destination,
-        msg,
-        &logger.as_ref(),
-        args.quiet,
-        args.timestamp,
-        progress_row,
-    ) {
-        Ok((copied, skipped)) => {
-            let done_msg = format!(
-                "\n\n\n{} ({}, {})",
-                msg.backup_ended,
-                &msg.files_copied.replace("{}", &copied.to_string()),
-                &msg.files_skipped.replace("{}", &skipped.to_string())
-            );
-            print_message(
-                &done_msg,
-                &logger.as_ref(),
-                args.quiet,
-                args.timestamp,
-                None,
-                true,
-            );
-        }
-        Err(e) => {
-            let error_msg = format!("{}: {}", msg.generic_error, e);
-            print_message(
-                &error_msg,
-                &logger.as_ref(),
-                false,
-                args.timestamp,
-                None,
-                true,
-            );
-            std::process::exit(1);
-        }
-    }
-
-    Ok(())
 }
