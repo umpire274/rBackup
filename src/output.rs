@@ -1,13 +1,24 @@
 use crate::config::Config;
+use crate::utils::Logger;
+use crossterm::style::ResetColor;
 use crossterm::{
-    QueueableCommand,
     cursor::MoveTo,
+    execute,
     style::Print,
     terminal::{Clear, ClearType},
 };
-use std::fs::File;
-use std::io::{BufWriter, Write, stdout};
-use std::sync::{Arc, Mutex};
+use globset::GlobSet;
+use std::io::{Write, stdout};
+
+#[derive(Debug, Clone)]
+pub struct LogContext {
+    pub logger: Option<Logger>,
+    pub quiet: bool,
+    pub with_timestamp: bool,
+    pub row: Option<u16>,
+    pub on_log: bool,
+    pub exclude_matcher: Option<GlobSet>,
+}
 
 pub fn now() -> String {
     let custom_format = Config::load().unwrap().timestamp_format;
@@ -16,32 +27,30 @@ pub fn now() -> String {
         .to_string()
 }
 
-pub fn log_output(
-    msg: &str,
-    logger: &Option<Arc<Mutex<BufWriter<File>>>>,
-    quiet: bool,
-    with_timestamp: bool,
-    row: Option<u16>,
-    on_log: bool,
-) {
-    let full_msg = if with_timestamp && !msg.is_empty() {
+pub fn log_output(msg: &str, ctx: &LogContext) {
+    let full_msg = if ctx.with_timestamp && !msg.is_empty() {
         format!("[{}] {}", now(), msg)
     } else {
         msg.to_string()
     };
 
-    if let Some(row) = row {
-        let mut stdout = stdout();
-        let _ = stdout
-            .queue(MoveTo(0, row))
-            .and_then(|s| s.queue(Clear(ClearType::CurrentLine)))
-            .and_then(|s| s.queue(Print(&full_msg)))
-            .and_then(|s| s.flush());
-    } else if !quiet {
-        println!("{}", full_msg);
+    // Output su terminale
+    if !ctx.quiet {
+        if let Some(row) = ctx.row {
+            let _ = execute!(
+                stdout(),
+                MoveTo(0, row),
+                Clear(ClearType::CurrentLine),
+                Print(&full_msg),
+                ResetColor
+            );
+        } else {
+            println!("{}", full_msg);
+        }
     }
 
-    if on_log && let Some(file) = logger {
+    // Output su file di log (solo se presente)
+    if let Some(file) = &ctx.logger {
         let mut file = file.lock().unwrap();
         let _ = writeln!(file, "{}", full_msg);
     }

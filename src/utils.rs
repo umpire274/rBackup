@@ -1,4 +1,4 @@
-use crate::output::log_output;
+use crate::output::{LogContext, log_output};
 use crate::ui::draw_ui;
 use crossterm::execute;
 use crossterm::terminal::{Clear, ClearType};
@@ -38,17 +38,17 @@ pub struct Messages {
     pub error_exclude_parsing: String,
 }
 
+pub type Logger = Arc<Mutex<BufWriter<File>>>;
+
 pub fn clear_terminal() {
     execute!(stdout(), Clear(ClearType::All)).unwrap();
 }
 
-/// Raggruppa le opzioni di copia.
-pub struct CopyOptions<'a> {
-    pub logger: &'a Option<Arc<Mutex<BufWriter<File>>>>,
-    pub quiet: bool,
-    pub timestamp: bool,
-    pub exclude_matcher: Option<GlobSet>,
-    pub progress_row: u16,
+pub fn create_logger(path: Option<&Path>) -> Option<Logger> {
+    path.map(|p| {
+        let file = File::create(p).expect("Unable to create log file");
+        Arc::new(Mutex::new(BufWriter::new(file)))
+    })
 }
 
 pub type Translations = HashMap<String, Messages>;
@@ -76,7 +76,7 @@ pub fn copy_incremental(
     src_dir: &Path,
     dest_dir: &Path,
     msg: &Messages,
-    options: &CopyOptions,
+    options: &LogContext,
 ) -> io::Result<(usize, usize)> {
     let entries: Vec<_> = WalkDir::new(src_dir)
         .into_iter()
@@ -123,14 +123,13 @@ pub fn copy_incremental(
             }
         };
 
-        log_output(
-            "",
-            options.logger,
-            options.quiet,
-            options.timestamp,
-            Option::from(options.progress_row - 2),
-            false,
-        );
+        let mut my_option = options.clone();
+
+        my_option.with_timestamp = false;
+        my_option.row = options.row.map(|r| r - 2);
+        my_option.on_log = false;
+        log_output("", &my_option);
+
         let log_line = format!(
             "#{} {} {} - {}.",
             (copied.load(Ordering::SeqCst) + skipped.load(Ordering::SeqCst)) as f32,
@@ -138,18 +137,14 @@ pub fn copy_incremental(
             src_path.display(),
             status
         );
-        log_output(
-            &log_line,
-            options.logger,
-            options.quiet,
-            options.timestamp,
-            Option::from(options.progress_row - 3),
-            true,
-        );
+        my_option.with_timestamp = options.with_timestamp;
+        my_option.row = options.row.map(|r| r - 3);
+        my_option.on_log = true;
+        log_output(&log_line, &my_option);
 
         draw_ui(
             (copied.load(Ordering::SeqCst) + skipped.load(Ordering::SeqCst)) as f32,
-            options.progress_row - 1,
+            options.row.unwrap() - 1,
             total_files as f32,
             msg,
         );
