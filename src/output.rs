@@ -28,7 +28,7 @@ pub fn now() -> String {
 }
 
 pub fn log_output(msg: &str, ctx: &LogContext) {
-    let full_msg = if ctx.with_timestamp && !msg.is_empty() {
+    let full_msg = if ctx.with_timestamp && !msg.trim().is_empty() {
         format!("[{}] {}", now(), msg)
     } else {
         msg.to_string()
@@ -50,7 +50,9 @@ pub fn log_output(msg: &str, ctx: &LogContext) {
     }
 
     // Output su file di log (solo se presente)
-    if let Some(file) = &ctx.logger {
+    if let Some(file) = &ctx.logger
+        && ctx.on_log
+    {
         let mut file = file.lock().unwrap();
         let _ = writeln!(file, "{}", full_msg);
     }
