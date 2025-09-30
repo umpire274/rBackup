@@ -1,31 +1,14 @@
 use crate::output::{LogContext, log_output};
-use crate::utils::{Messages, build_exclude_matcher, clear_terminal, copy_incremental};
+use crate::utils::{Messages, clear_terminal, copy_incremental};
 use crossterm::terminal;
-use std::fs::File;
-use std::io::BufWriter;
+use std::io::Write;
 use std::path::Path;
-use std::sync::{Arc, Mutex};
 
-pub fn start_copy_message(
-    msg: &Messages,
-    logger: &Option<Arc<Mutex<BufWriter<File>>>>,
-    quiet: bool,
-    timestamp: bool,
-    source: &Path,
-    destination: &Path,
-) {
+pub fn start_copy_message(msg: &Messages, ctx: &LogContext, source: &Path, destination: &Path) {
     clear_terminal();
 
-    let ctx = LogContext {
-        logger: logger.clone(),
-        quiet,
-        with_timestamp: timestamp,
-        row: None,
-        on_log: true,
-        exclude_matcher: None,
-    };
-
-    log_output(&msg.backup_init, &ctx);
+    // Use provided context directly (don't mutate)
+    log_output(&msg.backup_init, ctx);
     log_output(
         &format!(
             "{} {} {} {}\n\n\n\n\n",
@@ -34,51 +17,19 @@ pub fn start_copy_message(
             msg.to,
             destination.display()
         ),
-        &ctx,
+        ctx,
     );
 }
 
-pub fn execute_copy(
-    msg: &Messages,
-    logger: &Option<Arc<Mutex<BufWriter<File>>>>,
-    quiet: bool,
-    timestamp: bool,
-    exclude_patterns: &[String],
-    source: &Path,
-    destination: &Path,
-) {
-    let mut ctx = LogContext {
-        logger: logger.clone(),
-        quiet,
-        with_timestamp: timestamp,
-        row: None,
-        on_log: true,
-        exclude_matcher: None,
-    };
-
+pub fn execute_copy(msg: &Messages, ctx: &mut LogContext, source: &Path, destination: &Path) {
     let (_cols, rows) = terminal::size().unwrap_or((80, 24));
     let progress_row = rows.saturating_sub(1);
-    let exclude_matcher = if !exclude_patterns.is_empty() {
-        match build_exclude_matcher(exclude_patterns) {
-            Ok(matcher) => Some(matcher),
-            Err(e) => {
-                ctx.with_timestamp = false;
-                ctx.on_log = false;
-                log_output(
-                    format!("❌ {}: {}", msg.error_exclude_parsing, e).as_str(),
-                    &ctx,
-                );
-                std::process::exit(1);
-            }
-        }
-    } else {
-        None
-    };
+
+    // ctx.exclude_matcher is expected to be prepared by the caller (commands::handle_copy)
 
     ctx.row = Some(progress_row);
-    ctx.exclude_matcher = exclude_matcher;
 
-    match copy_incremental(source, destination, msg, &ctx) {
+    match copy_incremental(source, destination, msg, ctx) {
         Ok((copied, skipped)) => {
             ctx.row = None;
             ctx.on_log = true;
@@ -88,14 +39,41 @@ pub fn execute_copy(
                 &msg.files_copied.replace("{}", &copied.to_string()),
                 &msg.files_skipped.replace("{}", &skipped.to_string())
             );
-            log_output(&done_msg, &ctx);
+            log_output(&done_msg, ctx);
+
+            // Flush logger if present
+            if let Some(log) = &ctx.logger {
+                match log.lock() {
+                    Ok(mut guard) => {
+                        let _ = guard.flush();
+                    }
+                    Err(poisoned) => {
+                        let mut guard = poisoned.into_inner();
+                        let _ = guard.flush();
+                    }
+                }
+            }
         }
         Err(e) => {
             ctx.quiet = false;
             ctx.row = None;
             ctx.on_log = true;
             let error_msg = format!("{}: {}", msg.generic_error, e);
-            log_output(&error_msg, &ctx);
+            log_output(&error_msg, ctx);
+
+            // Try to flush logger before exiting
+            if let Some(log) = &ctx.logger {
+                match log.lock() {
+                    Ok(mut guard) => {
+                        let _ = guard.flush();
+                    }
+                    Err(poisoned) => {
+                        let mut guard = poisoned.into_inner();
+                        let _ = guard.flush();
+                    }
+                }
+            }
+
             std::process::exit(1);
         }
     }

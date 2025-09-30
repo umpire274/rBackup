@@ -65,6 +65,14 @@ impl Config {
         Ok(conf)
     }
 
+    // New: safe loader that returns defaults on error instead of panicking
+    pub fn load_or_default() -> Self {
+        Config::load().unwrap_or_else(|_| Config {
+            language: "auto".to_string(),
+            timestamp_format: "%Y-%m-%d %H:%M:%S".to_string(),
+        })
+    }
+
     pub fn edit(editor: Option<String>) -> io::Result<()> {
         let editor_cmd = editor
             .or_else(|| env::var("EDITOR").ok())

@@ -22,3 +22,7 @@ sys-locale = "0.3.2"
 globset = "0.4.16"
 serde_yaml = "0.9.33"
 log = "0.4.27"
+
+[dev-dependencies]
+tempfile = "3.23.0"
+filetime = "0.2.26"

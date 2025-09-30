@@ -1,4 +1,3 @@
-use crate::config::Config;
 use crate::utils::Logger;
 use crossterm::style::ResetColor;
 use crossterm::{
@@ -7,7 +6,6 @@ use crossterm::{
     style::Print,
     terminal::{Clear, ClearType},
 };
-use globset::GlobSet;
 use std::io::{Write, stdout};
 
 #[derive(Debug, Clone)]
@@ -15,24 +13,42 @@ pub struct LogContext {
     pub logger: Option<Logger>,
     pub quiet: bool,
     pub with_timestamp: bool,
+    pub timestamp_format: Option<String>,
     pub row: Option<u16>,
     pub on_log: bool,
-    pub exclude_matcher: Option<GlobSet>,
+    /// If true, the `exclude_matcher` will be matched against the absolute
+    /// source path; when false (default), the matcher is applied to the path
+    /// relative to the source directory.
+    pub exclude_match_absolute: bool,
+    /// If true, the copy operation will be a dry-run: files won't be
+    /// actually copied, but the same output and counters will be produced.
+    pub dry_run: bool,
+    /// Optional list of the original exclude patterns (in the same order used to build the matcher).
+    /// Useful to log which pattern caused a skip.
+    pub exclude_patterns: Option<Vec<String>>,
+    /// Optional exclude matcher that supports identifying which pattern matched.
+    /// See `utils::ExcludeMatcher` for details.
+    pub exclude_matcher: Option<crate::utils::ExcludeMatcher>,
 }
 
-pub fn now() -> String {
-    let custom_format = Config::load().unwrap().timestamp_format;
-    chrono::Local::now()
-        .format(custom_format.as_str())
-        .to_string()
+const DEFAULT_TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
+
+pub fn now(fmt: &str) -> String {
+    chrono::Local::now().format(fmt).to_string()
 }
 
 pub fn log_output(msg: &str, ctx: &LogContext) {
-    let full_msg = if ctx.with_timestamp && !msg.trim().is_empty() {
-        format!("[{}] {}", now(), msg)
+    let ts = if ctx.with_timestamp && !msg.trim().is_empty() {
+        let fmt = ctx
+            .timestamp_format
+            .as_deref()
+            .unwrap_or(DEFAULT_TIMESTAMP_FORMAT);
+        format!("[{}] ", now(fmt))
     } else {
-        msg.to_string()
+        String::new()
     };
+
+    let full_msg = format!("{}{}", ts, msg);
 
     // Output su terminale
     if !ctx.quiet {
@@ -53,7 +69,15 @@ pub fn log_output(msg: &str, ctx: &LogContext) {
     if let Some(file) = &ctx.logger
         && ctx.on_log
     {
-        let mut file = file.lock().unwrap();
-        let _ = writeln!(file, "{}", full_msg);
+        match file.lock() {
+            Ok(mut guard) => {
+                let _ = writeln!(guard, "{}", full_msg);
+            }
+            Err(poisoned) => {
+                // If poisoned, extract the inner guard and try to write
+                let mut guard = poisoned.into_inner();
+                let _ = writeln!(guard, "{}", full_msg);
+            }
+        }
     }
 }
