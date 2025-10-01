@@ -6,6 +6,45 @@ All notable changes to the `rbackup` project will be documented in this file.
 
 ---
 
+## [v0.4.0] - 2025-10-01
+
+> Nota: l'utente ha chiesto di elencare le modifiche a partire dalla commit `192cdfdf` e successive. Non ho trovato localmente il riferimento a `192cdfdf`; quindi questa voce riassume tutte le modifiche effettuate nella codebase locale dopo lo stato precedente registrato in questo changelog (v0.3.1).
+
+### 🚀 New features
+
+- Added enhanced exclude support for `copy`:
+  - `--exclude <PATTERN>` accepts glob patterns applied by default to the path relative to the source directory.
+  - `--absolute-exclude` option to match patterns against absolute source paths.
+  - `--ignore-case` option for case-insensitive exclude matching.
+  - Exclude matching now also tests the file basename (filename only), solving cases like `$RECYCLE.BIN`, `Thumbs.db`, etc.
+- Added `--dry-run` behavior improvements: dry-run now simulates copies and reports counts without touching the destination.
+
+### 🧾 Logging & UX
+
+- Files that are skipped (either excluded by a pattern or because destination is newer) are now logged both to stdout and to the log file specified with `--log`.
+- Logs include the exclude pattern that caused the skip (when applicable), making it easier to diagnose why files were skipped.
+- Timestamps in logs are configurable and the `LogContext` carries the timestamp format.
+
+### 🔧 Refactor & robustness
+
+- `Config::load_or_default()` added to provide a safe fallback when the configuration file is missing or malformed.
+- `create_logger()` now returns a `Result<Option<Logger>>` instead of panicking on errors; logging file creation failures is handled gracefully.
+- `copy_incremental()` now streams `WalkDir` results (no longer builds an in-memory Vec of all files), reducing memory usage for large trees.
+- Centralized and simplified CLI parsing via a shared `cli` module (`src/cli.rs`) so the binary and tests reuse the same definitions.
+- Split test code out of `src/` into `tests/` integration tests and added tests for `is_newer`, exclude handling, and dry-run behavior.
+- Improved handling of mutex poisoning when writing to the log file; flusher calls added to ensure buffered logs are persisted.
+
+### ✅ Fixes
+
+- Fixed cases where some exclude patterns (basename patterns like `$RECYCLE.BIN`) were not matched.
+- Fixed logging so skipped files are included in the log file output.
+
+### 🧪 Tests
+
+- Added integration tests under `tests/` to exercise exclude matching, `is_newer` logic and dry-run semantics.
+
+---
+
 ## [v0.3.1] - 2025-09-12
 
 ### 🚀 Improvements
