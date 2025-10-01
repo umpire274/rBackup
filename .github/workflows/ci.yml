@@ -6,7 +6,7 @@ on:
     types: [ completed ]
 
 permissions:
-  contents: read
+  contents: write
 
 jobs:
   build:
@@ -66,7 +66,13 @@ jobs:
           mkdir -p release_artifacts/${{ matrix.target }}
           cd target/${{ matrix.target }}/release
           mkdir -p rbackup-${{ matrix.target }}
-          cp rbackup rbackup-${{ matrix.target }}/ 2>/dev/null || cp rbackup.exe rbackup-${{ matrix.target }}/
+          
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            cp rbackup.exe rbackup-${{ matrix.target }}/
+          else
+            cp rbackup rbackup-${{ matrix.target }}/
+          fi
+          
           cp $GITHUB_WORKSPACE/{README.md,LICENSE,CHANGELOG.md} rbackup-${{ matrix.target }}/
           
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
@@ -160,7 +166,7 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
       
       - name: Create GitHub Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v2
         with:
           tag_name: v${{ steps.extract_version.outputs.version }}
           name: "v${{ steps.extract_version.outputs.version }}"
