@@ -6,7 +6,7 @@ All notable changes to the `rbackup` project will be documented in this file.
 
 ---
 
-## [v0.4.0] - 2025-10-01
+## [v0.5.0] - 2025-10-01
 
 > Nota: l'utente ha chiesto di elencare le modifiche a partire dalla commit `192cdfdf` e successive. Non ho trovato localmente il riferimento a `192cdfdf`; quindi questa voce riassume tutte le modifiche effettuate nella codebase locale dopo lo stato precedente registrato in questo changelog (v0.3.1).
 
