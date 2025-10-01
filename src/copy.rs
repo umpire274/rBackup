@@ -21,6 +21,21 @@ pub fn start_copy_message(msg: &Messages, ctx: &LogContext, source: &Path, desti
     );
 }
 
+// Helper function: centralizza il flush del logger per evitare duplicazione
+fn flush_logger(ctx: &mut LogContext) {
+    if let Some(log) = &ctx.logger {
+        match log.lock() {
+            Ok(mut guard) => {
+                let _ = guard.flush();
+            }
+            Err(poisoned) => {
+                let mut guard = poisoned.into_inner();
+                let _ = guard.flush();
+            }
+        }
+    }
+}
+
 pub fn execute_copy(msg: &Messages, ctx: &mut LogContext, source: &Path, destination: &Path) {
     let (_cols, rows) = terminal::size().unwrap_or((80, 24));
     let progress_row = rows.saturating_sub(1);
@@ -34,25 +49,18 @@ pub fn execute_copy(msg: &Messages, ctx: &mut LogContext, source: &Path, destina
             ctx.row = None;
             ctx.on_log = true;
             let done_msg = format!(
-                "\n\n\n{} ({}, {})",
-                msg.backup_ended,
+                "\n\n\n{} ({}. {}, {})",
+                &msg.backup_ended,
+                &msg.files_total
+                    .replace("{}", &(copied + skipped).to_string()),
                 &msg.files_copied.replace("{}", &copied.to_string()),
                 &msg.files_skipped.replace("{}", &skipped.to_string())
             );
+
             log_output(&done_msg, ctx);
 
             // Flush logger if present
-            if let Some(log) = &ctx.logger {
-                match log.lock() {
-                    Ok(mut guard) => {
-                        let _ = guard.flush();
-                    }
-                    Err(poisoned) => {
-                        let mut guard = poisoned.into_inner();
-                        let _ = guard.flush();
-                    }
-                }
-            }
+            flush_logger(ctx);
         }
         Err(e) => {
             ctx.quiet = false;
@@ -62,17 +70,7 @@ pub fn execute_copy(msg: &Messages, ctx: &mut LogContext, source: &Path, destina
             log_output(&error_msg, ctx);
 
             // Try to flush logger before exiting
-            if let Some(log) = &ctx.logger {
-                match log.lock() {
-                    Ok(mut guard) => {
-                        let _ = guard.flush();
-                    }
-                    Err(poisoned) => {
-                        let mut guard = poisoned.into_inner();
-                        let _ = guard.flush();
-                    }
-                }
-            }
+            flush_logger(ctx);
 
             std::process::exit(1);
         }
