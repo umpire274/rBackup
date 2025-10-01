@@ -5,6 +5,9 @@ on:
     workflows: [ "Rust Build & Test" ]
     types: [ completed ]
 
+permissions:
+  contents: read
+
 jobs:
   build:
     if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
@@ -138,6 +141,8 @@ jobs:
   
   release:
     name: Create GitHub Release
+    permissions:
+      contents: write
     needs: consolidate
     runs-on: ubuntu-latest
     steps:
