@@ -6,6 +6,14 @@ All notable changes to the `rbackup` project will be documented in this file.
 
 ---
 
+## [v0.5.1] - 2025-10-01
+
+### 🔧 Change
+
+- Updated the end-of-copy message to include the total number of files processed (copied + skipped) in addition to the separate counts for copied and skipped files. This helps quickly see the overall scope of the operation.
+
+---
+
 ## [v0.5.0] - 2025-10-01
 
 This release closes GitHub issue #3 — fixes and improvements described below.
