@@ -9,124 +9,146 @@ permissions:
   contents: write
 
 jobs:
-  build:
+  build_lnx_win:
     if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
     runs-on: ${{ matrix.os }}
     strategy:
+      fail-fast: false
+      max-parallel: 2
       matrix:
         include:
           - os: ubuntu-latest
             target: x86_64-unknown-linux-gnu
             ext: tar.gz
-          - os: macos-latest
-            target: x86_64-apple-darwin
-            ext: tar.gz
-          - os: macos-latest
-            target: aarch64-apple-darwin
-            ext: tar.gz
+            bin: rbackup
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             ext: zip
+            bin: rbackup.exe
     
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
       
-      - name: Extract version (Unix)
-        if: matrix.os != 'windows-latest'
-        id: extract_version_unix
+      - name: Extract version (Unix/Win)
+        id: ver
         shell: bash
         run: |
           VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d '"' -f2)
-          echo "VERSION=$VERSION" >> $GITHUB_ENV
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
       
-      - name: Extract version (Windows)
-        if: matrix.os == 'windows-latest'
-        id: extract_version_win
-        shell: pwsh
-        run: |
-          $content = Get-Content Cargo.toml
-          foreach ($line in $content) {
-            if ($line -match '^version\s*=\s*\"(.+?)\"') {
-              $VERSION = $matches[1]
-              "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
-              break
-            }
-          }
+      - name: Cache cargo / target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
       
       - name: Install Rust target
         run: rustup target add ${{ matrix.target }}
       
-      - name: Build binary
+      - name: Build
         run: cargo build --release --target ${{ matrix.target }}
       
-      - name: Package binary
+      - name: Package
         shell: bash
         run: |
           mkdir -p release_artifacts/${{ matrix.target }}
           cd target/${{ matrix.target }}/release
           mkdir -p rbackup-${{ matrix.target }}
-          
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            cp rbackup.exe rbackup-${{ matrix.target }}/
-          else
-            cp rbackup rbackup-${{ matrix.target }}/
-          fi
-          
+          cp "${{ matrix.bin }}" rbackup-${{ matrix.target }}/
           cp $GITHUB_WORKSPACE/{README.md,LICENSE,CHANGELOG.md} rbackup-${{ matrix.target }}/
           
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+          if [[ "${{ matrix.ext }}" == "zip" ]]; then
             powershell -Command "Compress-Archive -Path rbackup-${{ matrix.target }}\\* -DestinationPath rbackup-${VERSION}-${{ matrix.target }}.zip"
             cp rbackup-${VERSION}-${{ matrix.target }}.zip $GITHUB_WORKSPACE/release_artifacts/${{ matrix.target }}/
           else
-            tar -czvf rbackup-${VERSION}-${{ matrix.target }}.tar.gz rbackup-${{ matrix.target }}
+            tar -czf rbackup-${VERSION}-${{ matrix.target }}.tar.gz rbackup-${{ matrix.target }}
             cp rbackup-${VERSION}-${{ matrix.target }}.tar.gz $GITHUB_WORKSPACE/release_artifacts/${{ matrix.target }}/
           fi
       
-      - name: Generate SHA256 checksum
-        shell: bash
-        run: |
-          cd release_artifacts/${{ matrix.target }}
-          file="rbackup-${VERSION}-${{ matrix.target }}.${{ matrix.ext }}"
-          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
-            pwsh -Command '
-              $file = "'"$file"'"
-              $hash = (Get-FileHash -Algorithm SHA256 $file).Hash.ToLower()
-              "$hash *$file" | Out-File -Encoding utf8 "$file.sha256"
-            '
-          else
-            sha256sum "$file" > "$file.sha256" || shasum -a 256 "$file" > "$file.sha256"
-          fi
-      
-      - name: Sign with GPG
-        shell: bash
-        run: |
-          cd release_artifacts/${{ matrix.target }}
-          file="rbackup-${VERSION}-${{ matrix.target }}.${{ matrix.ext }}"
-          echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import
-          
-          echo "$GPG_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 \
-            --pinentry-mode loopback \
-            --output "$file.sig" --detach-sign "$file"
-        env:
-          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-      
-      - name: Upload artifact by platform
+      - name: Upload artifact (lnx/win)
         uses: actions/upload-artifact@v4
         with:
           name: release_artifacts-${{ matrix.target }}
           path: release_artifacts/${{ matrix.target }}
   
-  consolidate:
-    name: Consolidate Artifacts
-    needs: build
-    runs-on: ubuntu-latest
+  build_macos_dual:
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
+    runs-on: macos-14
+    timeout-minutes: 60
+    
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
       
-      - name: Download all build artifacts
+      - name: Extract version
+        id: ver
+        shell: bash
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d '"' -f2)
+          echo "VERSION=$VERSION" >> "$GITHUB_ENV"
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+      
+      - name: Cache cargo / target
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: macos-cargo-dual-${{ hashFiles('**/Cargo.lock') }}
+      
+      - name: Install Rust targets (x86_64 + aarch64)
+        run: |
+          rustup target add x86_64-apple-darwin
+          rustup target add aarch64-apple-darwin
+      
+      - name: Build x86_64
+        run: cargo build --release --target x86_64-apple-darwin
+      
+      - name: Package x86_64
+        shell: bash
+        run: |
+          mkdir -p release_artifacts/x86_64-apple-darwin
+          cd target/x86_64-apple-darwin/release
+          mkdir -p rbackup-x86_64-apple-darwin
+          cp rbackup rbackup-x86_64-apple-darwin/
+          cp $GITHUB_WORKSPACE/{README.md,LICENSE,CHANGELOG.md} rbackup-x86_64-apple-darwin/
+          tar -czf rbackup-${VERSION}-x86_64-apple-darwin.tar.gz rbackup-x86_64-apple-darwin
+          cp rbackup-${VERSION}-x86_64-apple-darwin.tar.gz $GITHUB_WORKSPACE/release_artifacts/x86_64-apple-darwin/
+      
+      - name: Build aarch64
+        run: cargo build --release --target aarch64-apple-darwin
+      
+      - name: Package aarch64
+        shell: bash
+        run: |
+          mkdir -p release_artifacts/aarch64-apple-darwin
+          cd target/aarch64-apple-darwin/release
+          mkdir -p rbackup-aarch64-apple-darwin
+          cp rbackup rbackup-aarch64-apple-darwin/
+          cp $GITHUB_WORKSPACE/{README.md,LICENSE,CHANGELOG.md} rbackup-aarch64-apple-darwin/
+          tar -czf rbackup-${VERSION}-aarch64-apple-darwin.tar.gz rbackup-aarch64-apple-darwin
+          cp rbackup-${VERSION}-aarch64-apple-darwin.tar.gz $GITHUB_WORKSPACE/release_artifacts/aarch64-apple-darwin/
+      
+      - name: Upload artifacts (macOS)
+        uses: actions/upload-artifact@v4
+        with:
+          name: release_artifacts-macos
+          path: |
+            release_artifacts/x86_64-apple-darwin
+            release_artifacts/aarch64-apple-darwin
+  
+  consolidate:
+    name: Consolidate Artifacts
+    needs: [ build_lnx_win, build_macos_dual ]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           pattern: release_artifacts-*
@@ -138,34 +160,66 @@ jobs:
         run: |
           mkdir -p release_artifacts
           find temp_download -type f -exec cp {} release_artifacts/ \;
-      
-      - name: Upload consolidated artifacts
+
+      - name: Upload consolidated
         uses: actions/upload-artifact@v4
         with:
           name: release_artifacts
           path: release_artifacts
   
   release:
-    name: Create GitHub Release
-    permissions:
-      contents: write
+    name: Create GitHub Release (sign on Linux)
     needs: consolidate
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
+      - name: Checkout (for Cargo.toml/CHANGELOG)
         uses: actions/checkout@v4
       
-      - name: Download consolidated artifacts
+      - name: Download consolidated
         uses: actions/download-artifact@v4
         with:
           name: release_artifacts
           path: release_artifacts
       
-      - name: Extract version from Cargo.toml
+      - name: Extract version
         id: extract_version
         run: |
           VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d '"' -f2)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+      
+      - name: Generate SHA256 for all files
+        shell: bash
+        run: |
+          cd release_artifacts
+          # genera un file SHA256 per ogni artefatto singolarmente:
+          for f in rbackup-*.*; do
+            [[ -f "$f" ]] || continue
+            sha256sum "$f" > "$f.sha256" || shasum -a 256 "$f" > "$f.sha256"
+          done
+      
+      - name: Import GPG key
+        shell: bash
+        run: |
+          mkdir -p ~/.gnupg && chmod 700 ~/.gnupg
+          echo "allow-loopback-pinentry" > ~/.gnupg/gpg-agent.conf
+          gpgconf --kill gpg-agent
+          echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+      
+      - name: Sign all artifacts (detach .sig)
+        shell: bash
+        run: |
+          cd release_artifacts
+          for f in rbackup-*.*; do
+            [[ -f "$f" ]] || continue
+            gpg --batch --yes --pinentry-mode loopback \
+                --passphrase "$GPG_PASSPHRASE" \
+                --output "$f.sig" --detach-sign "$f"
+          done
+        env:
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
       
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -180,3 +234,4 @@ jobs:
             release_artifacts/rbackup-*.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
