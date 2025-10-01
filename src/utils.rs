@@ -29,6 +29,7 @@ pub struct Messages {
     pub copying_file: String,
     //    pub invalid_source: String,
     pub language_not_supported: String,
+    pub files_total: String,
     pub files_copied: String,
     pub files_skipped: String,
     pub copy_progress: String,
@@ -103,7 +104,7 @@ pub fn copy_incremental(
             Err(_) => continue,
         };
 
-        // Apply exclude matcher on path relative to src_dir (or absolute if requested)
+        // Apply 'exclude matcher' on path relative to src_dir (or absolute if requested)
         if let Some(ex) = &options.exclude_matcher {
             // Determine target to match and ask ExcludeMatcher which pattern matched (if any)
             let target_path = if options.exclude_match_absolute {
