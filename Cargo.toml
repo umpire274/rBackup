@@ -1,7 +1,7 @@
 [package]
 name = "rbackup"
-version = "0.3.1"
-edition = "2021"
+version = "0.5.0"
+edition = "2024"
 license = "MIT"
 description = "Incremental, cross-platform and multithreaded backup tool written in Rust"
 readme = "README.md"
@@ -12,10 +12,17 @@ categories = ["command-line-utilities", "filesystem"]
 exclude = ["/dist/*", "/temp_build/*"]
 
 [dependencies]
-clap = { version = "4.5.47", features = ["derive"] }
+clap = { version = "4.5.48", features = ["derive"] }
 crossterm = "0.29.0"
 walkdir = "2.5.0"
-serde = { version = "1.0.219", features = ["derive"] }
-serde_json = "1.0.143"
+serde = { version = "1.0.225", features = ["derive"] }
+serde_json = "1.0.145"
 chrono = "0.4.42"
 sys-locale = "0.3.2"
+globset = "0.4.16"
+serde_yaml = "0.9.33"
+log = "0.4.27"
+
+[dev-dependencies]
+tempfile = "3.23.0"
+filetime = "0.2.26"

@@ -1,64 +1,29 @@
+mod cli;
+mod commands;
+mod config;
+mod copy;
+mod output;
 mod ui;
 mod utils;
 
-use clap::{CommandFactory, Parser};
-use crossterm::terminal::{Clear, ClearType};
-use crossterm::{execute, terminal};
-use std::fs::File;
-use std::io;
-use std::io::stdout;
-use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
-use utils::{copy_incremental, load_translations, log_output, Logger};
+use crate::cli::{Cli, Commands};
+use crate::config::Config;
+use crate::utils::load_translations;
+use clap::Parser;
 
-#[derive(Parser, Debug)]
-#[command(
-    author = "Alessandro Maestri",
-    version,
-    about = "rBackup - New incremental directory backup",
-    long_about = "rbackup: a Rust-based backup tool that copies only new or modified files from a source to a destination directory. Supports multithreading, language localization, logging, and progress display.",
-    arg_required_else_help = true
-)]
-struct Args {
-    /// Source directory
-    source: Option<PathBuf>,
-
-    /// Destination directory
-    destination: Option<PathBuf>,
-
-    /// Language code: en or it (default: en)
-    #[arg(short, long, default_value = "auto")]
-    lang: String,
-
-    /// Quiet mode: suppress console output
-    #[arg(short = 'q', long = "quiet")]
-    quiet: bool,
-
-    /// Write output to a log file
-    #[arg(long = "log", value_name = "FILE")]
-    log_file: Option<PathBuf>,
-
-    /// Add timestamp to log and console output
-    #[arg(short = 't', long = "timestamp")]
-    timestamp: bool,
-}
-
-fn clear_terminal() {
-    execute!(stdout(), Clear(ClearType::All)).unwrap();
-}
-
-fn main() -> io::Result<()> {
-    let args = Args::parse();
+fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let cli = Cli::parse();
 
     let translations = load_translations()?;
-    let lang_code = if args.lang == "auto" {
+    let config = Config::load_or_default();
+
+    let lang_code = if config.language == "auto" {
         sys_locale::get_locale()
             .and_then(|val| val.split(&['_', '-']).next().map(str::to_lowercase))
             .unwrap_or_else(|| "en".to_string())
     } else {
-        args.lang.to_lowercase()
+        config.language.to_lowercase()
     };
-
     let msg = match translations.get(&lang_code) {
         Some(messages) => messages,
         None => {
@@ -73,93 +38,8 @@ fn main() -> io::Result<()> {
         }
     };
 
-    // Mostra help o version senza elevazione
-    if (args.quiet || args.log_file.is_none())
-        && (args.source.is_none() || args.destination.is_none())
-    {
-        eprintln!("Error: missing source or destination directory.\n");
-        Args::command().print_help()?;
-        println!();
-        std::process::exit(1);
+    match &cli.command {
+        Commands::Config { .. } => commands::handle_conf(&cli.command, msg, &config),
+        Commands::Copy { .. } => commands::handle_copy(&cli.command, msg, &config),
     }
-
-    let logger: Logger = if let Some(ref path) = args.log_file {
-        match File::create(path) {
-            Ok(file) => Some(Arc::new(Mutex::new(file))),
-            Err(e) => {
-                eprintln!("Failed to create log file: {e}");
-                std::process::exit(1);
-            }
-        }
-    } else {
-        None
-    };
-
-    let source = args.source.as_ref().unwrap();
-    let destination = args.destination.as_ref().unwrap();
-
-    if !source.is_dir() {
-        eprintln!("{}", msg.invalid_source);
-        std::process::exit(1);
-    }
-
-    if !destination.exists() {
-        std::fs::create_dir_all(destination)?;
-    }
-
-    clear_terminal();
-
-    log_output(
-        msg.backup_init.as_str(),
-        &logger,
-        args.quiet,
-        args.timestamp,
-    );
-
-    log_output(
-        &format!(
-            "{} {} {} {}\n\n\n\n",
-            msg.starting_backup,
-            source.display(),
-            msg.to,
-            destination.display()
-        ),
-        &logger,
-        args.quiet,
-        args.timestamp,
-    );
-
-    let (_cols, rows) = terminal::size().unwrap_or((80, 24));
-    let progress_row = rows.saturating_sub(1);
-
-    let (copied, skipped) = copy_incremental(
-        source,
-        destination,
-        msg,
-        &logger,
-        args.quiet,
-        args.timestamp,
-        progress_row,
-    )?;
-
-    log_output(
-        format!("\n\n{}", msg.backup_ended.as_str()).as_str(),
-        &logger,
-        args.quiet,
-        args.timestamp,
-    );
-    log_output(
-        &msg.files_copied.replace("{}", &copied.to_string()),
-        &logger,
-        args.quiet,
-        args.timestamp,
-    );
-    log_output(
-        &msg.files_skipped.replace("{}", &skipped.to_string()),
-        &logger,
-        args.quiet,
-        args.timestamp,
-    );
-
-    Ok(())
 }

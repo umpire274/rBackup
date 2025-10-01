@@ -1,34 +1,42 @@
 {
   "en": {
 	"appname": "rBackup",
+	"cur_conf": "Current configuration",
+	"conf_file_not_found": "Configuration file not found",
+	"conf_initialized": "Configuration initialized at",
 	"backup_init": "=== Backup started ===",
 	"backup_ended": "=== Backup ended ===",
 	"starting_backup": "Backup from:",
 	"to": "to:",
 	"copying_file": "Copying:",
-	"backup_done": "Backup completed.",
 	"invalid_source": "Error: the source is not a valid directory.",
 	"language_not_supported": "Language \"{}\" not supported, falling back to \"en\".",
 	"files_copied": "Files copied: {}",
 	"files_skipped": "Files skipped or failed: {}",
 	"copy_progress": "Copy progress:",
 	"copied_file": "Copied.",
-	"skipped_file": "Skipped."
+	"skipped_file": "Skipped.",
+	"generic_error": "Error during copy",
+	"error_exclude_parsing": "Error parsing exclude patterns"
   },
   "it": {
 	"appname": "rBackup",
+	"cur_conf": "Attuale configurazione",
+	"conf_file_not_found": "File di configurazione non trovato",
+	"conf_initialized": "Creata nuova configurazione nel file",
 	"backup_init": "=== Backup iniziato ===",
 	"backup_ended": "=== Backup terminato ===",
 	"starting_backup": "Backup da:",
 	"to": "a:",
 	"copying_file": "Copio:",
-	"backup_done": "Backup completato.",
 	"invalid_source": "Errore: la sorgente non è una directory valida.",
 	"language_not_supported": "Lingua \"{}\" non supportata, uso \"en\" come fallback.",
 	"files_copied": "File copiati: {}",
 	"files_skipped": "File saltati o falliti: {}",
 	"copy_progress": "Avanzamento copia:",
 	"copied_file": "Copiato.",
-	"skipped_file": "Saltato."
+	"skipped_file": "Saltato.",
+	"generic_error": "Errore durante la copia",
+	"error_exclude_parsing": "Errore durante l'analisi dei modelli di esclusione"
   }
 }

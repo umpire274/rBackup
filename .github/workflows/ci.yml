@@ -1,60 +1,171 @@
-name: CI
+name: Build, Package and Release
 
-on: [ push, pull_request, workflow_dispatch ]
-
-permissions:
-  contents: read
+on:
+  workflow_run:
+    workflows: [ "Rust Build & Test" ]
+    types: [ completed ]
 
 jobs:
   build:
-    name: Build and Test on ${{ matrix.os }}
+    if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
     runs-on: ${{ matrix.os }}
-    
     strategy:
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        include:
+          - os: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            ext: tar.gz
+          - os: macos-latest
+            target: x86_64-apple-darwin
+            ext: tar.gz
+          - os: macos-latest
+            target: aarch64-apple-darwin
+            ext: tar.gz
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+            ext: zip
     
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
       
-      - name: Install Rust (stable)
-        uses: dtolnay/rust-toolchain@stable
+      - name: Extract version (Unix)
+        if: matrix.os != 'windows-latest'
+        id: extract_version_unix
+        shell: bash
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d '"' -f2)
+          echo "VERSION=$VERSION" >> $GITHUB_ENV
+      
+      - name: Extract version (Windows)
+        if: matrix.os == 'windows-latest'
+        id: extract_version_win
+        shell: pwsh
+        run: |
+          $content = Get-Content Cargo.toml
+          foreach ($line in $content) {
+            if ($line -match '^version\s*=\s*\"(.+?)\"') {
+              $VERSION = $matches[1]
+              "VERSION=$VERSION" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+              break
+            }
+          }
+      
+      - name: Install Rust target
+        run: rustup target add ${{ matrix.target }}
+      
+      - name: Build binary
+        run: cargo build --release --target ${{ matrix.target }}
+      
+      - name: Package binary
+        shell: bash
+        run: |
+          mkdir -p release_artifacts/${{ matrix.target }}
+          cd target/${{ matrix.target }}/release
+          mkdir -p rbackup-${{ matrix.target }}
+          cp rbackup rbackup-${{ matrix.target }}/ 2>/dev/null || cp rbackup.exe rbackup-${{ matrix.target }}/
+          cp $GITHUB_WORKSPACE/{README.md,LICENSE,CHANGELOG.md} rbackup-${{ matrix.target }}/
+          
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            powershell -Command "Compress-Archive -Path rbackup-${{ matrix.target }}\\* -DestinationPath rbackup-${VERSION}-${{ matrix.target }}.zip"
+            cp rbackup-${VERSION}-${{ matrix.target }}.zip $GITHUB_WORKSPACE/release_artifacts/${{ matrix.target }}/
+          else
+            tar -czvf rbackup-${VERSION}-${{ matrix.target }}.tar.gz rbackup-${{ matrix.target }}
+            cp rbackup-${VERSION}-${{ matrix.target }}.tar.gz $GITHUB_WORKSPACE/release_artifacts/${{ matrix.target }}/
+          fi
+      
+      - name: Generate SHA256 checksum
+        shell: bash
+        run: |
+          cd release_artifacts/${{ matrix.target }}
+          file="rbackup-${VERSION}-${{ matrix.target }}.${{ matrix.ext }}"
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            pwsh -Command '
+              $file = "'"$file"'"
+              $hash = (Get-FileHash -Algorithm SHA256 $file).Hash.ToLower()
+              "$hash *$file" | Out-File -Encoding utf8 "$file.sha256"
+            '
+          else
+            sha256sum "$file" > "$file.sha256" || shasum -a 256 "$file" > "$file.sha256"
+          fi
+      
+      - name: Sign with GPG
+        shell: bash
+        run: |
+          cd release_artifacts/${{ matrix.target }}
+          file="rbackup-${VERSION}-${{ matrix.target }}.${{ matrix.ext }}"
+          echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import
+          
+          echo "$GPG_PASSPHRASE" | gpg --batch --yes --passphrase-fd 0 \
+            --pinentry-mode loopback \
+            --output "$file.sig" --detach-sign "$file"
+        env:
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+          GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
+      
+      - name: Upload artifact by platform
+        uses: actions/upload-artifact@v4
         with:
-          components: clippy, rustfmt
+          name: release_artifacts-${{ matrix.target }}
+          path: release_artifacts/${{ matrix.target }}
+  
+  consolidate:
+    name: Consolidate Artifacts
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
       
-      - name: Cache cargo registry
-        uses: actions/cache@v3
+      - name: Download all build artifacts
+        uses: actions/download-artifact@v4
         with:
-          path: ~/.cargo/registry
-          key: ${{ runner.os }}-cargo-registry-${{ hashFiles('**/Cargo.lock') }}
+          pattern: release_artifacts-*
+          path: temp_download
+          merge-multiple: true
       
-      - name: Cache cargo git
-        uses: actions/cache@v3
+      - name: Combine into single folder
+        shell: bash
+        run: |
+          mkdir -p release_artifacts
+          find temp_download -type f -exec cp {} release_artifacts/ \;
+      
+      - name: Upload consolidated artifacts
+        uses: actions/upload-artifact@v4
         with:
-          path: ~/.cargo/git
-          key: ${{ runner.os }}-cargo-git-${{ hashFiles('**/Cargo.lock') }}
+          name: release_artifacts
+          path: release_artifacts
+  
+  release:
+    name: Create GitHub Release
+    needs: consolidate
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
       
-      - name: Cache target directory
-        uses: actions/cache@v3
+      - name: Download consolidated artifacts
+        uses: actions/download-artifact@v4
         with:
-          path: target
-          key: ${{ runner.os }}-target-${{ hashFiles('**/Cargo.lock') }}
+          name: release_artifacts
+          path: release_artifacts
       
-      - name: Build in release mode
-        run: cargo build --release
+      - name: Extract version from Cargo.toml
+        id: extract_version
+        run: |
+          VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d '"' -f2)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
       
-      - name: Run tests
-        run: cargo test --all
-      
-      - name: Run Clippy (no warnings allowed)
-        run: cargo clippy --all-targets --all-features -- -D warnings
-      
-      - name: Check code formatting
-        run: cargo fmt --all -- --check
-      
-      - name: Install cargo-audit
-        run: cargo install cargo-audit
-      
-      - name: Run cargo audit
-        run: cargo audit
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.extract_version.outputs.version }}
+          name: "v${{ steps.extract_version.outputs.version }}"
+          body_path: CHANGELOG.md
+          files: |
+            release_artifacts/rbackup-*.tar.gz
+            release_artifacts/rbackup-*.zip
+            release_artifacts/rbackup-*.sig
+            release_artifacts/rbackup-*.sha256
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
