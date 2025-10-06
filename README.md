@@ -27,6 +27,33 @@
 
 [![Packaging status](https://repology.org/badge/vertical-allrepos/rbackup.svg)](https://repology.org/project/rbackup/versions)
 
+### 🐧 AUR (Arch Linux)
+
+[![AUR](https://img.shields.io/aur/version/rbackup)](https://aur.archlinux.org/packages/rbackup)
+
+```bash
+yay -S rfortune
+# or
+paru -S rfortune
+```
+
+### 🍺 Homebrew (macOS/Linux)
+
+[![Homebrew Tap](https://img.shields.io/badge/homebrew-tap-brightgreen)](https://github.com/umpire274/homebrew-rbackup)
+
+```bash
+brew tap umpire274/rbackup
+brew install rbackup
+```
+
+### 🦀 Crates.io (Rust)
+
+[![Crates.io](https://img.shields.io/crates/v/rbackup)](https://crates.io/crates/rbackup)
+
+```bash
+cargo install rbackup
+```
+
 ---
 
 ## 📥 Download
