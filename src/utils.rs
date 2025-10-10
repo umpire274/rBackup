@@ -10,8 +10,11 @@ use crate::ui::draw_ui;
 use crossterm::execute;
 use crossterm::terminal::{Clear, ClearType};
 use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
+use rayon::prelude::*; // parallel iterator utilities
 use serde::Deserialize;
-use std::io::{BufWriter, stdout};
+use std::io::{BufWriter, Write, stdout};
+use std::sync::mpsc;
+use std::thread;
 use std::{
     collections::HashMap,
     fs::{self, File},
@@ -152,37 +155,64 @@ pub fn copy_incremental(
     msg: &Messages,
     options: &LogContext,
 ) -> io::Result<(usize, usize)> {
-    // Count total files in a first streaming pass (no Vec allocation)
-    let total_files = WalkDir::new(src_dir)
+    // Collect all file entries in a single pass to avoid walking the tree twice.
+    // This trades memory for reduced filesystem traversal overhead which is
+    // beneficial for very large hierarchies where walking twice is expensive.
+    let mut entries: Vec<_> = WalkDir::new(src_dir)
         .into_iter()
         .filter_map(Result::ok)
         .filter(|e| e.path().is_file())
-        .count();
+        .collect();
+
+    let total_files = entries.len();
+
+    // Prepare channel and logger thread if a file logger is configured.
+    let (log_tx, log_handle) = if let Some(logger) = &options.logger {
+        let (tx, rx) = mpsc::channel::<String>();
+        let logger = logger.clone();
+        // Spawn a dedicated thread that serializes writes to the log file.
+        let handle = thread::spawn(move || {
+            for line in rx {
+                match logger.lock() {
+                    Ok(mut guard) => {
+                        let _ = writeln!(guard, "{}", line);
+                        let _ = guard.flush();
+                    }
+                    Err(poisoned) => {
+                        if let Ok(mut guard) = std::panic::catch_unwind(|| poisoned.into_inner()) {
+                            let _ = writeln!(guard, "{}", line);
+                            let _ = guard.flush();
+                        }
+                    }
+                }
+            }
+        });
+        (Some(tx), Some(handle))
+    } else {
+        (None, None)
+    };
 
     let copied = AtomicUsize::new(0);
     let skipped = AtomicUsize::new(0);
 
-    // Second streaming pass to perform the copy
-    for entry in WalkDir::new(src_dir)
-        .into_iter()
-        .filter_map(Result::ok)
-        .filter(|e| e.path().is_file())
-    {
-        let src_path = entry.path();
+    // Sort entries deterministically to improve cache behaviour and make output stable.
+    entries.sort_by_key(|e| e.path().to_owned());
+
+    // Use parallel iterator over entries to perform copies concurrently.
+    entries.into_par_iter().for_each(|entry| {
+        let src_path = entry.path().to_owned();
         let rel_path = match src_path.strip_prefix(src_dir) {
-            Ok(p) => p,
-            Err(_) => continue,
+            Ok(p) => p.to_owned(),
+            Err(_) => return,
         };
 
         // Apply 'exclude matcher' on path relative to src_dir (or absolute if requested)
         if let Some(ex) = &options.exclude_matcher {
-            // Determine target to match and ask ExcludeMatcher which pattern matched (if any)
             let target_path = if options.exclude_match_absolute {
-                src_path
+                src_path.as_path()
             } else {
-                rel_path
+                rel_path.as_path()
             };
-            // also try basename if no match yet
             let matched_pattern = ex.is_match(target_path).or_else(|| {
                 rel_path
                     .file_name()
@@ -190,98 +220,116 @@ pub fn copy_incremental(
             });
 
             if let Some(pat) = matched_pattern {
-                skipped.fetch_add(1, Ordering::SeqCst);
+                skipped.fetch_add(1, Ordering::Relaxed);
 
-                // Log skipped (excluded) file similar to other skipped cases, include pattern
-                let skip_ctx = LogContext {
-                    logger: options.logger.clone(),
-                    quiet: options.quiet,
-                    with_timestamp: options.with_timestamp,
-                    timestamp_format: options.timestamp_format.clone(),
-                    row: options.row.map(|r| r.saturating_sub(3)),
-                    on_log: true,
-                    exclude_matcher: None,
-                    exclude_match_absolute: options.exclude_match_absolute,
-                    dry_run: options.dry_run,
-                    exclude_patterns: options.exclude_patterns.clone(),
-                };
-
-                // blank line (to keep UI clean)
-                let mut blank_ctx = skip_ctx.clone();
-                blank_ctx.with_timestamp = false;
-                blank_ctx.on_log = false;
-                blank_ctx.row = options.row.map(|r| r.saturating_sub(2));
-                log_output("", &blank_ctx);
-
+                // Build log line; send to file logger via channel if configured
+                let count =
+                    (copied.load(Ordering::Relaxed) + skipped.load(Ordering::Relaxed)) as f32;
                 let log_line = format!(
                     "#{} {} {} - {} (pattern: {}).",
-                    (copied.load(Ordering::SeqCst) + skipped.load(Ordering::SeqCst)) as f32,
+                    count,
                     msg.copying_file,
                     src_path.display(),
                     &msg.skipped_file,
                     pat
                 );
 
+                if let Some(tx) = &log_tx {
+                    // Prepend timestamp if requested
+                    let full = if options.with_timestamp && !log_line.trim().is_empty() {
+                        let fmt = options
+                            .timestamp_format
+                            .as_deref()
+                            .unwrap_or("%Y-%m-%d %H:%M:%S");
+                        format!("[{}] {}", crate::output::now(fmt), log_line)
+                    } else {
+                        log_line.clone()
+                    };
+                    let _ = tx.send(full);
+                }
+
+                // Terminal output: call log_output with a context that has no file logger to avoid locking
+                let skip_ctx = LogContext {
+                    logger: None,
+                    quiet: options.quiet,
+                    with_timestamp: options.with_timestamp,
+                    timestamp_format: options.timestamp_format.clone(),
+                    row: options.row.map(|r| r.saturating_sub(3)),
+                    on_log: false,
+                    exclude_matcher: None,
+                    exclude_match_absolute: options.exclude_match_absolute,
+                    dry_run: options.dry_run,
+                    exclude_patterns: options.exclude_patterns.clone(),
+                };
+
+                let mut blank_ctx = skip_ctx.clone();
+                blank_ctx.with_timestamp = false;
+                blank_ctx.on_log = false;
+                blank_ctx.row = options.row.map(|r| r.saturating_sub(2));
+                log_output("", &blank_ctx);
+
                 log_output(&log_line, &skip_ctx);
 
-                // Update UI
+                // Update UI occasionally to reduce contention on terminal
                 let total_f = if total_files == 0 {
                     1.0
                 } else {
                     total_files as f32
                 };
-                draw_ui(
-                    (copied.load(Ordering::SeqCst) + skipped.load(Ordering::SeqCst)) as f32,
-                    options.row.unwrap_or(1).saturating_sub(1),
-                    total_f,
-                    msg,
-                );
+                let progress =
+                    (copied.load(Ordering::Relaxed) + skipped.load(Ordering::Relaxed)) as f32;
+                if (progress as usize) % 16 == 0 || (progress as usize) == total_files {
+                    draw_ui(
+                        progress,
+                        options.row.unwrap_or(1).saturating_sub(1),
+                        total_f,
+                        msg,
+                    );
+                }
 
-                continue;
+                return;
             }
         }
 
-        let dest_path = dest_dir.join(rel_path);
+        let dest_path = dest_dir.join(&rel_path);
 
         if let Some(parent) = dest_path.parent() {
-            fs::create_dir_all(parent).ok();
+            let _ = fs::create_dir_all(parent);
         }
 
-        let status = match is_newer(src_path, &dest_path) {
+        let status = match is_newer(src_path.as_path(), &dest_path) {
             Ok(true) => {
                 if options.dry_run {
-                    // In dry-run mode, don't actually copy
-                    copied.fetch_add(1, Ordering::SeqCst);
+                    copied.fetch_add(1, Ordering::Relaxed);
                     &msg.copied_file
                 } else {
-                    match fs::copy(src_path, &dest_path) {
+                    match fs::copy(src_path.as_path(), &dest_path) {
                         Ok(_) => {
-                            copied.fetch_add(1, Ordering::SeqCst);
+                            copied.fetch_add(1, Ordering::Relaxed);
                             &msg.copied_file
                         }
                         Err(_) => {
-                            skipped.fetch_add(1, Ordering::SeqCst);
+                            skipped.fetch_add(1, Ordering::Relaxed);
                             &msg.skipped_file
                         }
                     }
                 }
             }
             Ok(false) | Err(_) => {
-                skipped.fetch_add(1, Ordering::SeqCst);
+                skipped.fetch_add(1, Ordering::Relaxed);
                 &msg.skipped_file
             }
         };
 
-        // Build a minimal temporary LogContext to avoid cloning the whole options
+        // Build a minimal temporary LogContext for terminal output only
         let mut tmp_ctx = LogContext {
-            logger: options.logger.clone(),
+            logger: None,
             quiet: options.quiet,
             with_timestamp: false,
             timestamp_format: options.timestamp_format.clone(),
             row: options.row.map(|r| r.saturating_sub(2)),
             on_log: false,
             exclude_matcher: None,
-            // propagate new fields
             exclude_match_absolute: options.exclude_match_absolute,
             dry_run: options.dry_run,
             exclude_patterns: options.exclude_patterns.clone(),
@@ -289,17 +337,32 @@ pub fn copy_incremental(
 
         log_output("", &tmp_ctx);
 
+        let count = (copied.load(Ordering::Relaxed) + skipped.load(Ordering::Relaxed)) as f32;
         let log_line = format!(
             "#{} {} {} - {}.",
-            (copied.load(Ordering::SeqCst) + skipped.load(Ordering::SeqCst)) as f32,
+            count,
             msg.copying_file,
             src_path.display(),
             status
         );
 
+        // Send to file logger thread if present
+        if let Some(tx) = &log_tx {
+            let full = if options.with_timestamp && !log_line.trim().is_empty() {
+                let fmt = options
+                    .timestamp_format
+                    .as_deref()
+                    .unwrap_or("%Y-%m-%d %H:%M:%S");
+                format!("[{}] {}", crate::output::now(fmt), log_line)
+            } else {
+                log_line.clone()
+            };
+            let _ = tx.send(full);
+        }
+
         tmp_ctx.with_timestamp = options.with_timestamp;
         tmp_ctx.row = options.row.map(|r| r.saturating_sub(3));
-        tmp_ctx.on_log = true;
+        tmp_ctx.on_log = false; // terminal-only
         log_output(&log_line, &tmp_ctx);
 
         let total_f = if total_files == 0 {
@@ -307,17 +370,26 @@ pub fn copy_incremental(
         } else {
             total_files as f32
         };
-        draw_ui(
-            (copied.load(Ordering::SeqCst) + skipped.load(Ordering::SeqCst)) as f32,
-            options.row.unwrap_or(1).saturating_sub(1),
-            total_f,
-            msg,
-        );
+        let progress = (copied.load(Ordering::Relaxed) + skipped.load(Ordering::Relaxed)) as f32;
+        if (progress as usize) % 16 == 0 || (progress as usize) == total_files {
+            draw_ui(
+                progress,
+                options.row.unwrap_or(1).saturating_sub(1),
+                total_f,
+                msg,
+            );
+        }
+    });
+
+    // Close the logger channel and join the logger thread if it was spawned
+    drop(log_tx);
+    if let Some(handle) = log_handle {
+        let _ = handle.join();
     }
 
     Ok((
-        copied.load(Ordering::SeqCst),
-        skipped.load(Ordering::SeqCst),
+        copied.load(Ordering::Relaxed),
+        skipped.load(Ordering::Relaxed),
     ))
 }
 

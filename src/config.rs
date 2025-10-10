@@ -10,26 +10,21 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use serde::{Deserialize, Serialize};
+use serde_yaml;
 
 /// Runtime configuration for the application.
 ///
 /// This struct is deserialized from a YAML configuration file. Fields are kept
-/// minimal: language and timestamp format. Add fields here if you extend the
-/// configuration schema.
-///
-/// # Examples
-///
-/// ```rust,no_run
-/// use rbackup::config::Config;
-/// let cfg = Config::load_or_default();
-/// println!("Language: {}", cfg.language);
-/// ```
+/// minimal: language, timestamp format and number of worker threads. Add fields
+/// here if you extend the configuration schema.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct Config {
     /// Language code used for messages ("auto", "en", "it", ...)
     pub language: String,
     /// Timestamp format used when printing timestamps in logs (strftime syntax)
     pub timestamp_format: String,
+    /// Number of worker threads to use for parallel operations (Rayon pool)
+    pub jobs: usize,
 }
 
 /// Default configuration file template (YAML).
@@ -57,6 +52,10 @@ language: auto
 # - %S -> second (00-59)
 # Full reference: https://docs.rs/chrono/latest/chrono/format/strftime/index.html
 timestamp_format: '%Y-%m-%d %H:%M:%S'
+
+# Number of worker threads used for parallel copy operations.
+# Set to an integer > 0. Default: 4
+jobs: 4
 "#;
 
 impl Config {
@@ -73,6 +72,64 @@ impl Config {
         fs::write(&path, content)?;
 
         Ok(())
+    }
+
+    /// Upgrade the existing configuration file by inserting missing fields
+    /// with sensible defaults. If the file does not exist it will be created
+    /// using the default template. Returns `Ok(true)` if the file was created
+    /// or modified, `Ok(false)` if no changes were required.
+    pub fn upgrade_config_file() -> io::Result<bool> {
+        let path = Config::config_file();
+
+        // If file missing, create default and return changed=true
+        if !path.exists() {
+            Config::default_config()?;
+            return Ok(true);
+        }
+
+        let content = fs::read_to_string(&path)?;
+
+        // Helper: check if a top-level key exists (ignores commented lines)
+        fn has_key_uncommented(content: &str, key: &str) -> bool {
+            for line in content.lines() {
+                let trimmed = line.trim_start();
+                // skip commented lines
+                if trimmed.starts_with('#') || trimmed.is_empty() {
+                    continue;
+                }
+                if trimmed.starts_with(&format!("{}:", key)) {
+                    return true;
+                }
+            }
+            false
+        }
+
+        let mut additions = String::new();
+        let mut changed = false;
+
+        if !has_key_uncommented(&content, "language") {
+            additions.push_str("\n# Language for messages.\n# Supported values:\n# - auto   -> uses system locale\n# - en     -> English\n# - it     -> Italian\nlanguage: auto\n");
+            changed = true;
+        }
+
+        if !has_key_uncommented(&content, "timestamp_format") {
+            additions.push_str("\n# Timestamp format for log entries (uses `strftime` syntax)\n# Common placeholders: %Y, %m, %d, %H, %M, %S\ntimestamp_format: '%Y-%m-%d %H:%M:%S'\n");
+            changed = true;
+        }
+
+        if !has_key_uncommented(&content, "jobs") {
+            additions.push_str("\n# Number of worker threads used for parallel copy operations.\n# Set to an integer > 0. Default: 4\njobs: 4\n");
+            changed = true;
+        }
+
+        if changed {
+            use std::fs::OpenOptions;
+            use std::io::Write;
+            let mut f = OpenOptions::new().append(true).open(&path)?;
+            f.write_all(additions.as_bytes())?;
+        }
+
+        Ok(changed)
     }
 
     /// Compute the canonical location of the configuration file for the
@@ -108,6 +165,7 @@ impl Config {
         Config::load().unwrap_or_else(|_| Config {
             language: "auto".to_string(),
             timestamp_format: "%Y-%m-%d %H:%M:%S".to_string(),
+            jobs: 4,
         })
     }
 

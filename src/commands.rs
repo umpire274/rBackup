@@ -10,6 +10,8 @@ use crate::config::Config;
 use crate::copy::{execute_copy, start_copy_message};
 use crate::output::{LogContext, log_output};
 use crate::utils::{Messages, build_exclude_matcher, create_logger};
+use rayon::ThreadPoolBuilder;
+use std::io;
 
 /// Handle the `config` subcommand.
 ///
@@ -34,6 +36,7 @@ pub fn handle_conf(
         print_config,
         init_config,
         edit_config,
+        upgrade_config,
         editor,
     } = cmd
     {
@@ -84,6 +87,29 @@ pub fn handle_conf(
             );
         }
 
+        if *upgrade_config {
+            match Config::upgrade_config_file() {
+                Ok(true) => {
+                    log_output(
+                        format!(
+                            "\u{2705} {} {:?}",
+                            msg.conf_initialized,
+                            Config::config_file()
+                        )
+                        .as_str(),
+                        &ctx,
+                    );
+                }
+                Ok(false) => {
+                    log_output("No changes required; configuration already up-to-date.", &ctx);
+                }
+                Err(e) => {
+                    log_output(format!("Failed to upgrade config: {}", e).as_str(), &ctx);
+                    return Err(Box::new(e));
+                }
+            }
+        }
+
         if *edit_config {
             Config::edit(editor.clone()).unwrap();
         }
@@ -125,8 +151,56 @@ pub fn handle_copy(
         absolute_exclude,
         ignore_case,
         dry_run,
+        jobs,
     } = cmd
     {
+        // Determine effective number of worker threads:
+        // precedence: CLI `--jobs` if present, otherwise value from config (default 4).
+        let effective_jobs: usize = if let Some(n) = jobs { *n } else { config.jobs };
+
+        if effective_jobs == 0 {
+            let ctx = LogContext {
+                logger: None,
+                quiet: false,
+                with_timestamp: false,
+                timestamp_format: Some(config.timestamp_format.clone()),
+                row: None,
+                on_log: false,
+                exclude_matcher: None,
+                exclude_match_absolute: false,
+                dry_run: false,
+                exclude_patterns: None,
+            };
+            log_output(&format!("Invalid value for jobs: {} (must be > 0)", effective_jobs), &ctx);
+            return Err(Box::new(io::Error::new(io::ErrorKind::InvalidInput, "jobs must be > 0")));
+        }
+
+        // Try to set a global Rayon thread pool; ignore errors if already set
+        match ThreadPoolBuilder::new().num_threads(effective_jobs).build_global() {
+            Ok(_) => {
+                // successfully set global pool
+            }
+            Err(e) => {
+                // If building global pool fails (already set), log a hint but continue
+                let ctx = LogContext {
+                    logger: None,
+                    quiet: false,
+                    with_timestamp: false,
+                    timestamp_format: Some(config.timestamp_format.clone()),
+                    row: None,
+                    on_log: false,
+                    exclude_matcher: None,
+                    exclude_match_absolute: false,
+                    dry_run: false,
+                    exclude_patterns: None,
+                };
+                log_output(
+                    format!("Warning: could not set Rayon thread pool to {}: {}", effective_jobs, e).as_str(),
+                    &ctx,
+                );
+            }
+        }
+
         // create_logger now returns io::Result<Option<Logger>>
         let logger = match create_logger(log.as_deref()) {
             Ok(l) => l,

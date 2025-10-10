@@ -85,6 +85,15 @@ pub enum Commands {
         /// Do a dry-run (don't actually copy files)
         #[arg(long = "dry-run", action = ArgAction::SetTrue, help = "Perform a dry-run without copying files")]
         dry_run: bool,
+
+        /// Number of worker threads to use for parallel copy (optional)
+        #[arg(
+            short = 'j',
+            long = "jobs",
+            value_name = "N",
+            help = "Number of worker threads to use (overrides automatic choice)"
+        )]
+        jobs: Option<usize>,
     },
 
     /// Manage the configuration file (view or edit)
@@ -103,6 +112,10 @@ pub enum Commands {
             help = "Edit the configuration file (default editor: $EDITOR, or nano/vim/notepad)"
         )]
         edit_config: bool,
+
+        /// Upgrade the existing configuration file by inserting new fields if missing
+        #[arg(long = "upgrade", help = "Insert new config options into existing rbackup.conf when missing", action = ArgAction::SetTrue)]
+        upgrade_config: bool,
 
         /// Specify the editor to use (overrides $EDITOR/$VISUAL).
         /// Common choices: vim, nano.
