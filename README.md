@@ -80,6 +80,8 @@ rbackup ~/Documents /mnt/backup_drive/Documents
 
 ## 🧩 Options
 
+Global options (applicable to all commands)
+
 | Option                | Description                      |
 |-----------------------|----------------------------------|
 | `-q`, `--quiet`       | Suppress console output          |
@@ -88,6 +90,76 @@ rbackup ~/Documents /mnt/backup_drive/Documents
 | `-l`, `--lang <code>` | Force language (e.g. `en`, `it`) |
 | `-V`, `--version`     | Show version                     |
 | `-h`, `--help`        | Show help message                |
+
+---
+
+## 📌 Commands
+
+Below are the top-level commands with the most relevant options and quick usage notes for each. This layout is easier to scan than a dense table when commands have many options.
+
+### copy
+
+Description: Perform an incremental backup from a `source` directory to a `destination` directory. Only new or modified files are copied.
+
+Usage:
+
+```sh
+rbackup copy <source> <destination> [OPTIONS]
+```
+
+Important options:
+
+- `<source> <destination>` — required positional arguments
+- `-q`, `--quiet` — suppress console output
+- `-t`, `--timestamp` — prepend timestamps to messages
+- `--log <FILE>` — write output to a log file
+- `-x, --exclude <PATTERN>` — exclude files matching the given glob pattern (repeatable)
+- `--absolute-exclude` — match exclude patterns against absolute source paths
+- `--ignore-case` — perform case-insensitive matching for exclude patterns
+- `--dry-run` — perform a dry-run without copying files
+
+Example:
+
+```sh
+rbackup copy C:\source\folder D:\backup\folder --exclude "*.tmp" --dry-run --log dryrun.log
+```
+
+---
+
+### config
+
+Description: Manage the configuration file (view, initialize or edit).
+
+Usage:
+
+```sh
+rbackup config [OPTIONS]
+```
+
+Important options:
+
+- `--init` — initialize a default configuration file
+- `--print` — print the current configuration to stdout
+- `--edit` — open the configuration in the user's editor
+- `--editor <EDITOR>` — specify the editor to use (overrides $EDITOR/$VISUAL)
+
+Example:
+
+```sh
+rbackup config --init
+```
+
+---
+
+### help
+
+Usage:
+
+```sh
+rbackup help [COMMAND]
+```
+
+Description: Print help for a specific command (e.g. `rbackup help copy`).
 
 ---
 
