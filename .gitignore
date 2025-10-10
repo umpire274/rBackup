@@ -3,3 +3,4 @@
 /dist
 *.txt
 *.log
+.github/copilot-instructions.md
