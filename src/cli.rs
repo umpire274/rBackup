@@ -10,6 +10,9 @@ use std::path::PathBuf;
 ///
 /// Use `Cli::parse()` (provided by clap) to obtain a populated instance.
 ///
+/// If no subcommand is provided the `command` field will be `None` and the
+/// caller can decide how to react (for example: print help and exit 0).
+///
 /// # Examples
 ///
 /// ```rust,no_run
@@ -18,8 +21,9 @@ use std::path::PathBuf;
 /// // Let clap parse arguments from the current process
 /// let cli = Cli::parse();
 /// match cli.command {
-///     rbackup::cli::Commands::Copy { .. } => println!("Copy command chosen"),
-///     rbackup::cli::Commands::Config { .. } => println!("Config command chosen"),
+///     Some(rbackup::cli::Commands::Copy { .. }) => println!("Copy command chosen"),
+///     Some(rbackup::cli::Commands::Config { .. }) => println!("Config command chosen"),
+///     None => println!("No subcommand provided"),
 /// }
 /// ```
 #[derive(Debug, Parser)]
@@ -31,9 +35,10 @@ use std::path::PathBuf;
     long_about = "rbackup: a Rust-based backup tool that copies only new or modified files from a source to a destination directory. Supports multithreading, language localization, logging, and progress display."
 )]
 pub struct Cli {
-    /// Selected subcommand and its options
+    /// Selected subcommand and its options. Optional to allow showing help
+    /// without Clap treating the absence of a subcommand as an error.
     #[command(subcommand)]
-    pub command: Commands,
+    pub command: Option<Commands>,
 }
 
 /// Available subcommands for `rbackup`.

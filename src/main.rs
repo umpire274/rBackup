@@ -15,7 +15,7 @@ mod utils;
 use crate::cli::{Cli, Commands};
 use crate::config::Config;
 use crate::utils::load_translations;
-use clap::Parser;
+use clap::{Parser, CommandFactory};
 
 /// Program entry point.
 ///
@@ -29,6 +29,15 @@ use clap::Parser;
 /// ergonomically usable in examples and tests.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
+
+    // If no subcommand was provided, print the help and exit successfully.
+    if cli.command.is_none() {
+        // Build the clap command from the derive and print the long help.
+        let mut cmd = Cli::command();
+        cmd.print_long_help()?;
+        println!();
+        return Ok(());
+    }
 
     let translations = load_translations()?;
     let config = Config::load_or_default();
@@ -55,7 +64,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     };
 
     match &cli.command {
-        Commands::Config { .. } => commands::handle_conf(&cli.command, msg, &config),
-        Commands::Copy { .. } => commands::handle_copy(&cli.command, msg, &config),
+        Some(cmd @ Commands::Config { .. }) => commands::handle_conf(cmd, msg, &config),
+        Some(cmd @ Commands::Copy { .. }) => commands::handle_copy(cmd, msg, &config),
+        None => unreachable!(),
     }
 }
