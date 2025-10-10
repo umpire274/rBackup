@@ -278,7 +278,7 @@ pub fn copy_incremental(
                 };
                 let progress =
                     (copied.load(Ordering::Relaxed) + skipped.load(Ordering::Relaxed)) as f32;
-                if (progress as usize) % 16 == 0 || (progress as usize) == total_files {
+                if (progress as usize).is_multiple_of(16) || (progress as usize) == total_files {
                     draw_ui(
                         progress,
                         options.row.unwrap_or(1).saturating_sub(1),
@@ -371,7 +371,7 @@ pub fn copy_incremental(
             total_files as f32
         };
         let progress = (copied.load(Ordering::Relaxed) + skipped.load(Ordering::Relaxed)) as f32;
-        if (progress as usize) % 16 == 0 || (progress as usize) == total_files {
+        if (progress as usize).is_multiple_of(16) || (progress as usize) == total_files {
             draw_ui(
                 progress,
                 options.row.unwrap_or(1).saturating_sub(1),

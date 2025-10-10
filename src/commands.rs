@@ -101,7 +101,10 @@ pub fn handle_conf(
                     );
                 }
                 Ok(false) => {
-                    log_output("No changes required; configuration already up-to-date.", &ctx);
+                    log_output(
+                        "No changes required; configuration already up-to-date.",
+                        &ctx,
+                    );
                 }
                 Err(e) => {
                     log_output(format!("Failed to upgrade config: {}", e).as_str(), &ctx);
@@ -171,12 +174,21 @@ pub fn handle_copy(
                 dry_run: false,
                 exclude_patterns: None,
             };
-            log_output(&format!("Invalid value for jobs: {} (must be > 0)", effective_jobs), &ctx);
-            return Err(Box::new(io::Error::new(io::ErrorKind::InvalidInput, "jobs must be > 0")));
+            log_output(
+                &format!("Invalid value for jobs: {} (must be > 0)", effective_jobs),
+                &ctx,
+            );
+            return Err(Box::new(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "jobs must be > 0",
+            )));
         }
 
         // Try to set a global Rayon thread pool; ignore errors if already set
-        match ThreadPoolBuilder::new().num_threads(effective_jobs).build_global() {
+        match ThreadPoolBuilder::new()
+            .num_threads(effective_jobs)
+            .build_global()
+        {
             Ok(_) => {
                 // successfully set global pool
             }
@@ -195,7 +207,11 @@ pub fn handle_copy(
                     exclude_patterns: None,
                 };
                 log_output(
-                    format!("Warning: could not set Rayon thread pool to {}: {}", effective_jobs, e).as_str(),
+                    format!(
+                        "Warning: could not set Rayon thread pool to {}: {}",
+                        effective_jobs, e
+                    )
+                    .as_str(),
                     &ctx,
                 );
             }

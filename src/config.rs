@@ -10,7 +10,6 @@ use std::path::PathBuf;
 use std::process::Command;
 
 use serde::{Deserialize, Serialize};
-use serde_yaml;
 
 /// Runtime configuration for the application.
 ///

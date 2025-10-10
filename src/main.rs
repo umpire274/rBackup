@@ -15,7 +15,7 @@ mod utils;
 use crate::cli::{Cli, Commands};
 use crate::config::Config;
 use crate::utils::load_translations;
-use clap::{Parser, CommandFactory};
+use clap::{CommandFactory, Parser};
 
 /// Program entry point.
 ///
