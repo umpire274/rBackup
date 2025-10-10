@@ -76,9 +76,7 @@ Add an entry like this to `assets/translations.json` (merge it at top-level with
 ```json
 {
   "es": {
-    "appname": "rBackup",git add -A
-    git commit -m "docs(translations): add QA checklist to TRANSLATIONS.md and update README/CHANGELOG use-cases" -m "Append QA checklist for translators to assets/TRANSLATIONS.md. The checklist covers placeholders, encoding, UI length considerations, validation commands and PR checklist. Also updated README/CHANGELOG with use-case references. Docs only; verified validate script."git add -A
-    git commit -m "docs(translations): add QA checklist to TRANSLATIONS.md and update README/CHANGELOG use-cases" -m "Append QA checklist for translators to assets/TRANSLATIONS.md. The checklist covers placeholders, encoding, UI length considerations, validation commands and PR checklist. Also updated README/CHANGELOG with use-case references. Docs only; verified validate script."
+    "appname": "rBackup",
     "cur_conf": "Configuración actual",
     "conf_file_not_found": "Archivo de configuración no encontrado",
     "conf_initialized": "Configuración inicializada en",
