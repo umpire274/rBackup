@@ -5,13 +5,13 @@
 //! copying implementation. Public items are documented with examples where
 //! relevant.
 
-use crate::output::{LogContext, log_output};
-use crate::ui::draw_ui;
+use crate::output::LogContext;
 use crossterm::execute;
 use crossterm::terminal::{Clear, ClearType};
 use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use rayon::prelude::*; // parallel iterator utilities
 use serde::Deserialize;
+use std::collections::VecDeque;
 use std::io::{BufWriter, Write, stdout};
 use std::sync::mpsc;
 use std::thread;
@@ -25,7 +25,37 @@ use std::{
         atomic::{AtomicUsize, Ordering},
     },
 };
-use walkdir::WalkDir;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
+use walkdir::WalkDir; // added for UI scroll buffer
+
+/// Truncate a string so that its displayed width (in monospace columns)
+/// does not exceed `max`. This preserves Unicode character boundaries.
+fn truncate_to_width(s: &str, max: usize) -> String {
+    if max == 0 {
+        return String::new();
+    }
+    let mut out = String::new();
+    let mut width = 0usize;
+    for c in s.chars() {
+        let w = UnicodeWidthChar::width(c).unwrap_or(0);
+        if width + w > max {
+            break;
+        }
+        out.push(c);
+        width += w;
+    }
+    out
+}
+
+/// Events sent to the single UI thread to serialize terminal access.
+///
+/// Message: a textual line to append to the scrollable area.
+/// Progress: update the fixed progress bar displayed on the bottom row.
+#[derive(Debug)]
+enum UiEvent {
+    Message(String),
+    Progress { copied: f32, total: f32 },
+}
 
 /// Localizable messages loaded from `assets/translations.json`.
 ///
@@ -166,6 +196,116 @@ pub fn copy_incremental(
 
     let total_files = entries.len();
 
+    // Prepare UI channel and spawn a dedicated UI thread that owns all
+    // terminal writes. This prevents concurrent calls to crossterm from
+    // multiple worker threads which produced garbled output.
+    let (ui_tx, ui_handle) = {
+        let (tx, rx) = mpsc::channel::<UiEvent>();
+        // Clone all strings we need from `msg` into an owned `Messages`
+        // instance that can be used inside the UI thread.
+        let ui_msg = Messages {
+            cur_conf: msg.cur_conf.clone(),
+            conf_file_not_found: msg.conf_file_not_found.clone(),
+            conf_initialized: msg.conf_initialized.clone(),
+            backup_init: msg.backup_init.clone(),
+            backup_ended: msg.backup_ended.clone(),
+            starting_backup: msg.starting_backup.clone(),
+            to: msg.to.clone(),
+            copying_file: msg.copying_file.clone(),
+            language_not_supported: msg.language_not_supported.clone(),
+            files_total: msg.files_total.clone(),
+            files_copied: msg.files_copied.clone(),
+            files_skipped: msg.files_skipped.clone(),
+            copy_progress: msg.copy_progress.clone(),
+            copied_file: msg.copied_file.clone(),
+            skipped_file: msg.skipped_file.clone(),
+            generic_error: msg.generic_error.clone(),
+            error_exclude_parsing: msg.error_exclude_parsing.clone(),
+        };
+
+        let handle = thread::spawn(move || {
+            use crossterm::cursor::MoveTo;
+            use crossterm::execute;
+            use crossterm::style::Print;
+            use crossterm::terminal;
+            use crossterm::terminal::ClearType;
+            use std::io::stdout;
+
+            let mut buffer: VecDeque<String> = VecDeque::new();
+
+            // Helper to redraw the scrollable area above the progress bar.
+            // This truncates messages to the terminal width to avoid wrapping
+            // onto the progress bar row and pads with spaces to clear leftover
+            // characters from previous longer lines.
+            let redraw = |buf: &VecDeque<String>, cols: u16, scroll_rows: usize| {
+                // Use cols-1 as maximum printable content width to avoid terminals
+                // that wrap when writing exactly the last column. Clear each line
+                // first and then print at most `max_content` display columns.
+                if cols == 0 {
+                    return;
+                }
+                let max_content = cols.saturating_sub(1) as usize;
+
+                for i in 0..scroll_rows {
+                    if i < buf.len() {
+                        // Truncate by display width, then pad with spaces to clear
+                        // leftover characters from previous content.
+                        let mut s = truncate_to_width(&buf[i], max_content);
+                        let disp = UnicodeWidthStr::width(s.as_str());
+                        if disp < max_content {
+                            s.push_str(&" ".repeat(max_content - disp));
+                        }
+                        let _ = execute!(
+                            stdout(),
+                            MoveTo(0, i as u16),
+                            Clear(ClearType::CurrentLine),
+                            Print(s)
+                        );
+                    } else {
+                        // clear the line if there's no content for that row
+                        let _ =
+                            execute!(stdout(), MoveTo(0, i as u16), Clear(ClearType::CurrentLine));
+                    }
+                }
+            };
+
+            // initial draw: clear whole screen
+            let _ = execute!(stdout(), Clear(ClearType::All));
+
+            for ev in rx {
+                // recompute terminal size on each event to handle resizes
+                let (cols, rows) = terminal::size().unwrap_or((80, 24));
+                let progress_row = rows.saturating_sub(1);
+                let scroll_rows = progress_row as usize; // number of rows for scrolling area
+
+                // adjust buffer size if terminal height changed
+                while buffer.len() > scroll_rows {
+                    buffer.pop_front();
+                }
+
+                match ev {
+                    UiEvent::Message(s) => {
+                        if scroll_rows == 0 {
+                            // no space to render messages; just ignore
+                            continue;
+                        }
+                        buffer.push_back(s);
+                        if buffer.len() > scroll_rows {
+                            buffer.pop_front();
+                        }
+                        redraw(&buffer, cols, scroll_rows);
+                    }
+                    UiEvent::Progress { copied, total } => {
+                        // draw progress bar on the current bottom row
+                        crate::ui::draw_ui(copied, progress_row, total, &ui_msg);
+                    }
+                }
+            }
+        });
+
+        (tx, handle)
+    };
+
     // Prepare channel and logger thread if a file logger is configured.
     let (log_tx, log_handle) = if let Some(logger) = &options.logger {
         let (tx, rx) = mpsc::channel::<String>();
@@ -199,6 +339,9 @@ pub fn copy_incremental(
     entries.sort_by_key(|e| e.path().to_owned());
 
     // Use parallel iterator over entries to perform copies concurrently.
+    // keep the UI sender as an `Option<mpsc::Sender<UiEvent>>` so worker
+    // threads can check its presence before sending.
+    let ui_tx: Option<mpsc::Sender<UiEvent>> = Some(ui_tx);
     entries.into_par_iter().for_each(|entry| {
         let src_path = entry.path().to_owned();
         let rel_path = match src_path.strip_prefix(src_dir) {
@@ -248,27 +391,10 @@ pub fn copy_incremental(
                     let _ = tx.send(full);
                 }
 
-                // Terminal output: call log_output with a context that has no file logger to avoid locking
-                let skip_ctx = LogContext {
-                    logger: None,
-                    quiet: options.quiet,
-                    with_timestamp: options.with_timestamp,
-                    timestamp_format: options.timestamp_format.clone(),
-                    row: options.row.map(|r| r.saturating_sub(3)),
-                    on_log: false,
-                    exclude_matcher: None,
-                    exclude_match_absolute: options.exclude_match_absolute,
-                    dry_run: options.dry_run,
-                    exclude_patterns: options.exclude_patterns.clone(),
-                };
-
-                let mut blank_ctx = skip_ctx.clone();
-                blank_ctx.with_timestamp = false;
-                blank_ctx.on_log = false;
-                blank_ctx.row = options.row.map(|r| r.saturating_sub(2));
-                log_output("", &blank_ctx);
-
-                log_output(&log_line, &skip_ctx);
+                // Send message to UI thread for terminal rendering (scroll area)
+                if let Some(tx) = &ui_tx {
+                    let _ = tx.send(UiEvent::Message(log_line.clone()));
+                }
 
                 // Update UI occasionally to reduce contention on terminal
                 let total_f = if total_files == 0 {
@@ -278,13 +404,13 @@ pub fn copy_incremental(
                 };
                 let progress =
                     (copied.load(Ordering::Relaxed) + skipped.load(Ordering::Relaxed)) as f32;
-                if (progress as usize).is_multiple_of(16) || (progress as usize) == total_files {
-                    draw_ui(
-                        progress,
-                        options.row.unwrap_or(1).saturating_sub(1),
-                        total_f,
-                        msg,
-                    );
+                if ((progress as usize).is_multiple_of(16) || (progress as usize) == total_files)
+                    && let Some(tx) = &ui_tx
+                {
+                    let _ = tx.send(UiEvent::Progress {
+                        copied: progress,
+                        total: total_f,
+                    });
                 }
 
                 return;
@@ -321,22 +447,7 @@ pub fn copy_incremental(
             }
         };
 
-        // Build a minimal temporary LogContext for terminal output only
-        let mut tmp_ctx = LogContext {
-            logger: None,
-            quiet: options.quiet,
-            with_timestamp: false,
-            timestamp_format: options.timestamp_format.clone(),
-            row: options.row.map(|r| r.saturating_sub(2)),
-            on_log: false,
-            exclude_matcher: None,
-            exclude_match_absolute: options.exclude_match_absolute,
-            dry_run: options.dry_run,
-            exclude_patterns: options.exclude_patterns.clone(),
-        };
-
-        log_output("", &tmp_ctx);
-
+        // Build log line for both file logger and UI
         let count = (copied.load(Ordering::Relaxed) + skipped.load(Ordering::Relaxed)) as f32;
         let log_line = format!(
             "#{} {} {} - {}.",
@@ -360,10 +471,10 @@ pub fn copy_incremental(
             let _ = tx.send(full);
         }
 
-        tmp_ctx.with_timestamp = options.with_timestamp;
-        tmp_ctx.row = options.row.map(|r| r.saturating_sub(3));
-        tmp_ctx.on_log = false; // terminal-only
-        log_output(&log_line, &tmp_ctx);
+        // Send message to UI thread (terminal scroll area)
+        if let Some(tx) = &ui_tx {
+            let _ = tx.send(UiEvent::Message(log_line.clone()));
+        }
 
         let total_f = if total_files == 0 {
             1.0
@@ -371,15 +482,19 @@ pub fn copy_incremental(
             total_files as f32
         };
         let progress = (copied.load(Ordering::Relaxed) + skipped.load(Ordering::Relaxed)) as f32;
-        if (progress as usize).is_multiple_of(16) || (progress as usize) == total_files {
-            draw_ui(
-                progress,
-                options.row.unwrap_or(1).saturating_sub(1),
-                total_f,
-                msg,
-            );
+        if ((progress as usize).is_multiple_of(16) || (progress as usize) == total_files)
+            && let Some(tx) = &ui_tx
+        {
+            let _ = tx.send(UiEvent::Progress {
+                copied: progress,
+                total: total_f,
+            });
         }
     });
+
+    // Close the UI channel and join the UI thread
+    drop(ui_tx);
+    let _ = ui_handle.join();
 
     // Close the logger channel and join the logger thread if it was spawned
     drop(log_tx);
