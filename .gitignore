@@ -4,3 +4,4 @@
 *.txt
 *.log
 .github/copilot-instructions.md
+*.bak
