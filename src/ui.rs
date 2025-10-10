@@ -1,3 +1,7 @@
+//! Terminal UI helpers used for displaying progress bars and simple status lines.
+//!
+//! This module contains a small helper to draw a file-level progress bar.
+
 use crate::utils::Messages;
 use crossterm::{
     cursor::MoveTo,
@@ -7,6 +11,22 @@ use crossterm::{
 };
 use std::io::{Write, stdout};
 
+/// Draw a simple progress bar and file counter on the given terminal row.
+///
+/// # Parameters
+/// - `copied`: number of items processed so far (as float to support partial updates)
+/// - `progress_row`: terminal row where the progress bar will be drawn
+/// - `total`: total number of items to process
+/// - `msg`: localized message bundle used for the label
+///
+/// # Example
+///
+/// ```rust,ignore
+/// // Example usage (ignored by doctest because it requires full `Messages` setup)
+/// use rbackup::ui::draw_ui;
+/// // prepare `msg` by loading translations in real code
+/// // draw_ui(10.0, 20, 100.0, &msg);
+/// ```
 pub fn draw_ui(copied: f32, progress_row: u16, total: f32, msg: &Messages) {
     let progress = copied / total;
     let percent = (progress * 100.0).round();

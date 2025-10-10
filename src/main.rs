@@ -1,3 +1,9 @@
+//! rBackup binary entry point
+//!
+//! This file contains the `main` function which parses CLI arguments,
+//! loads translations and configuration, selects the effective language and
+//! dispatches the requested command handler.
+
 mod cli;
 mod commands;
 mod config;
@@ -11,6 +17,16 @@ use crate::config::Config;
 use crate::utils::load_translations;
 use clap::Parser;
 
+/// Program entry point.
+///
+/// The function performs the following steps:
+/// 1. Parse CLI arguments using `clap`.
+/// 2. Load embedded translations and the user configuration (falling back to defaults).
+/// 3. Determine the language code to use (either the configured value or system locale when `auto`).
+/// 4. Dispatch the selected subcommand to the handlers in `commands`.
+///
+/// Returns a boxed `std::error::Error` on failure to make the main signature
+/// ergonomically usable in examples and tests.
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     let cli = Cli::parse();
 

@@ -1,6 +1,27 @@
+//! Command-line interface definitions for the `rbackup` binary.
+//!
+//! This module defines the clap-powered `Cli` parser and the `Commands` enum
+//! describing the supported subcommands and their options.
+
 use clap::{ArgAction, Parser, Subcommand};
 use std::path::PathBuf;
 
+/// Parsed command-line arguments for the `rbackup` binary.
+///
+/// Use `Cli::parse()` (provided by clap) to obtain a populated instance.
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use clap::Parser;
+/// use rbackup::cli::Cli;
+/// // Let clap parse arguments from the current process
+/// let cli = Cli::parse();
+/// match cli.command {
+///     rbackup::cli::Commands::Copy { .. } => println!("Copy command chosen"),
+///     rbackup::cli::Commands::Config { .. } => println!("Config command chosen"),
+/// }
+/// ```
 #[derive(Debug, Parser)]
 #[command(
     name = "rbackup",
@@ -10,15 +31,23 @@ use std::path::PathBuf;
     long_about = "rbackup: a Rust-based backup tool that copies only new or modified files from a source to a destination directory. Supports multithreading, language localization, logging, and progress display."
 )]
 pub struct Cli {
+    /// Selected subcommand and its options
     #[command(subcommand)]
     pub command: Commands,
 }
 
+/// Available subcommands for `rbackup`.
+///
+/// Each variant contains the options relevant to that operation.
 #[derive(Debug, Subcommand)]
 pub enum Commands {
     /// Perform an incremental backup
     Copy {
         /// Source directory to backup
+        ///
+        /// This is interpreted as a filesystem path. The program will traverse
+        /// the directory recursively and copy new or modified files to the
+        /// destination.
         source: PathBuf,
 
         /// Destination directory

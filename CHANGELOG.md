@@ -6,6 +6,19 @@ All notable changes to the `rbackup` project will be documented in this file.
 
 ---
 
+## [Unreleased]
+
+### 📝 Documentation
+
+- Added comprehensive English API documentation across `src/` (docstrings and translated comments), converting existing Italian comments to English.
+- Added usage examples / small usage cases for common functions (e.g. `copy_incremental`, `build_exclude_matcher`).
+- Created `assets/TRANSLATIONS.md` describing translation keys, placeholder usage, and how to add new languages.
+- Added a translations consistency test: `tests/translations_consistency.rs` to ensure all language entries share the same set of keys.
+- No functional changes: documentation and tests only.
+- Validation: ran `cargo check` and `cargo test` locally; all tests passed.
+
+---
+
 ## [v0.5.1] - 2025-10-01
 
 ### 🔧 Change

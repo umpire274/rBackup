@@ -1,9 +1,30 @@
+//! Command handlers invoked by the CLI dispatcher.
+//!
+//! This module contains the high-level functions that implement the behavior
+//! of the `config` and `copy` subcommands. They adapt CLI arguments and the
+//! loaded configuration into the lower-level utilities responsible for I/O,
+//! logging and copying.
+
 use crate::cli::Commands;
 use crate::config::Config;
 use crate::copy::{execute_copy, start_copy_message};
 use crate::output::{LogContext, log_output};
 use crate::utils::{Messages, build_exclude_matcher, create_logger};
 
+/// Handle the `config` subcommand.
+///
+/// This function implements the logic for printing, creating or editing the
+/// configuration file. It receives the parsed CLI command, the localized
+/// messages and the effective configuration.
+///
+/// # Parameters
+/// - `cmd`: the parsed CLI command (expected to be `Commands::Config`).
+/// - `msg`: localized messages used for output.
+/// - `config`: currently loaded configuration values.
+///
+/// # Returns
+/// - `Ok(())` on success.
+/// - `Err(...)` on unexpected I/O errors (for example when creating the config file).
 pub fn handle_conf(
     cmd: &Commands,
     msg: &Messages,
@@ -70,6 +91,25 @@ pub fn handle_conf(
     Ok(())
 }
 
+/// Handle the `copy` subcommand.
+///
+/// This function prepares logging, exclude matchers and the `LogContext`,
+/// then starts the copy operation and prints the start/finish messages.
+///
+/// # Parameters
+/// - `cmd`: the parsed CLI command (expected to be `Commands::Copy`).
+/// - `msg`: localized messages used for output and log lines.
+/// - `config`: loaded configuration values, used for default timestamp formatting.
+///
+/// # Behavior and errors
+/// - Attempts to create an optional log file if requested. If log creation
+///   fails, an error message is printed and logging is disabled.
+/// - If exclude patterns are provided and parsing fails, the function will
+///   log an error and return a failure.
+///
+/// # Returns
+/// - `Ok(())` on success.
+/// - `Err(...)` if exclude pattern parsing fails or other I/O errors occur.
 pub fn handle_copy(
     cmd: &Commands,
     msg: &Messages,
