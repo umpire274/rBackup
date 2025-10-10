@@ -151,6 +151,82 @@ rbackup copy ~/Documents /mnt/backup/Documents --exclude '*.mp4' --exclude '$REC
 
 ---
 
+## Use cases (CLI & developer)
+
+This section provides concise, copy-pastable examples for common CLI workflows and for managing translations during development.
+
+### 1) Incremental backup (copy)
+
+- Basic backup:
+
+```bash
+rbackup C:\Users\alice\Documents D:\Backups\alice\Documents
+```
+
+- Backup with logging, timestamps and quiet off:
+
+```bash
+rbackup C:\source\folder D:\backup\folder --log backup.log --timestamp
+```
+
+- Dry-run to debug excludes and generate a report (Windows `cmd.exe`):
+
+```bat
+rbackup C:\source D:\dest --exclude "*.tmp" --dry-run --log dryrun.log
+```
+
+### 2) Manage configuration
+
+- Initialize a default configuration file:
+
+```bat
+rbackup config --init
+```
+
+- Edit configuration using the default editor (Windows will use Notepad if $EDITOR not set):
+
+```bat
+rbackup config --edit
+```
+
+### 3) Developer: translations workflow (translations_tool)
+
+A small helper script is provided at `scripts/translations_tool` to validate translations and to generate/apply language templates.
+
+- Validate all language entries have the same keys (must be run from the repo root):
+
+```bat
+cd scripts\translations_tool
+cargo run -- validate
+```
+
+- Generate a template for a new language `es` and print it (prefill with English values):
+
+```bat
+cd scripts\translations_tool
+cargo run -- template es --fill-en
+```
+
+- Apply (insert) a template for `es` into `assets/translations.json`, creating a timestamped backup, and do not overwrite if `es` already exists:
+
+```bat
+cd scripts\translations_tool
+cargo run -- apply es --fill-en
+```
+
+- Force overwrite an existing language entry (use with caution):
+
+```bat
+cd scripts\translations_tool
+cargo run -- apply es --fill-en --force
+```
+
+Notes:
+- The `apply` command creates a backup file under `assets/` named like `translations.json.YYYYMMDD_HHMMSS.bak` before modifying `assets/translations.json`.
+- After applying a template, translate the values in-place with your editor, then run `cargo run -- validate` to ensure key consistency.
+
+---
+
 ## 📝 Example
 
 ```sh

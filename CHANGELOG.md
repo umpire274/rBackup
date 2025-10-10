@@ -14,6 +14,7 @@ All notable changes to the `rbackup` project will be documented in this file.
 - Added usage examples / small usage cases for common functions (e.g. `copy_incremental`, `build_exclude_matcher`).
 - Created `assets/TRANSLATIONS.md` describing translation keys, placeholder usage, and how to add new languages.
 - Added a translations consistency test: `tests/translations_consistency.rs` to ensure all language entries share the same set of keys.
+- Added concrete use-case examples to `README.md` (CLI copy/config examples and translations tool workflow).
 - No functional changes: documentation and tests only.
 - Validation: ran `cargo check` and `cargo test` locally; all tests passed.
 
