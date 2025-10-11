@@ -212,7 +212,8 @@ rbackup copy /source /dest --exclude '*.tmp' --dry-run --log dryrun.log
 ```
 
 - The log file contains both `Copied` and `Skipped` entries. Skipped entries include the exclude pattern that caused the
-  skip when applicable, which helps debugging complex exclude sets.
+  skip when applicable, which helps debugging complex exclude sets. Skipped files are also printed to the console unless
+  the `--quiet` option is used.
 
 Use-cases
 

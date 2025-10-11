@@ -6,7 +6,24 @@ All notable changes to the `rbackup` project will be documented in this file.
 
 ---
 
-## [Unreleased]
+## [v0.6.0] - 2025-10-11
+
+### 🚀 Highlights
+
+- Added a dedicated Copilot onboarding file (`.github/copilot-instructions.md`) to speed up automated code agents and reduce PR churn.
+- Further enhanced `--exclude` behavior and documentation (see README) with clearer examples, zsh/bsh quoting tips and use-cases.
+- Improved translations workflow and added `scripts/translations_tool` features: template generation, apply with backup and consistency checks.
+- CI/workflows improvements and permissions fixes; ensured `rustfmt` and `clippy` are run in the lint job and release workflow extracts version from `Cargo.toml`.
+
+### 🧾 Logging & UX
+
+- Ensured skipped files are reported both to console (UI) and to the log file when `--log` is used. Log lines include the exclude pattern that caused a skip when applicable.
+- UI output serialisation to avoid progress-bar overwrite; introduced a single-threaded UI writer and a scroll buffer for per-file messages.
+
+### 🔧 Fixes & Maintenance
+
+- Bumped crate version to `0.6.0` and cleaned up release packaging scripts.
+- Minor refactors for robustness around logger/mutex handling and improved tests coverage (moved tests into `tests/`).
 
 ### 📝 Documentation
 
