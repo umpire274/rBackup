@@ -21,7 +21,7 @@ chrono = "0.4.42"
 sys-locale = "0.3.2"
 globset = "0.4.16"
 serde_yaml = "0.9.33"
-rayon = "1.7"
+rayon = "1.11.0"
 unicode-width = "0.2.2"
 
 [dev-dependencies]
