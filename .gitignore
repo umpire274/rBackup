@@ -3,6 +3,5 @@
 /dist
 *.txt
 *.log
-.github/copilot-instructions.md
 *.bak
 tmp_bench/*
