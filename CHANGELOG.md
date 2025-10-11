@@ -6,6 +6,37 @@ All notable changes to the `rbackup` project will be documented in this file.
 
 ---
 
+## [v0.6.0] - 2025-10-11
+
+### 🚀 Highlights
+
+- Added a dedicated Copilot onboarding file (`.github/copilot-instructions.md`) to speed up automated code agents and reduce PR churn.
+- Further enhanced `--exclude` behavior and documentation (see README) with clearer examples, zsh/bsh quoting tips and use-cases.
+- Improved translations workflow and added `scripts/translations_tool` features: template generation, apply with backup and consistency checks.
+- CI/workflows improvements and permissions fixes; ensured `rustfmt` and `clippy` are run in the lint job and release workflow extracts version from `Cargo.toml`.
+
+### 🧾 Logging & UX
+
+- Ensured skipped files are reported both to console (UI) and to the log file when `--log` is used. Log lines include the exclude pattern that caused a skip when applicable.
+- UI output serialisation to avoid progress-bar overwrite; introduced a single-threaded UI writer and a scroll buffer for per-file messages.
+
+### 🔧 Fixes & Maintenance
+
+- Bumped crate version to `0.6.0` and cleaned up release packaging scripts.
+- Minor refactors for robustness around logger/mutex handling and improved tests coverage (moved tests into `tests/`).
+
+### 📝 Documentation
+
+- Added comprehensive English API documentation across `src/` (docstrings and translated comments), converting existing Italian comments to English.
+- Added usage examples / small usage cases for common functions (e.g. `copy_incremental`, `build_exclude_matcher`).
+- Created `assets/TRANSLATIONS.md` describing translation keys, placeholder usage, and how to add new languages.
+- Added a translations consistency test: `tests/translations_consistency.rs` to ensure all language entries share the same set of keys.
+- Added concrete use-case examples to `README.md` (CLI copy/config examples and translations tool workflow).
+- No functional changes: documentation and tests only.
+- Validation: ran `cargo check` and `cargo test` locally; all tests passed.
+
+---
+
 ## [v0.5.1] - 2025-10-01
 
 ### 🔧 Change

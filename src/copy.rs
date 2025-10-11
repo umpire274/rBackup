@@ -1,9 +1,27 @@
+//! High-level copy helpers and user-facing messages.
+//!
+//! This module implements the start/finish messages and the main copy loop
+//! orchestration. The heavy lifting is performed by utilities in `utils` and
+//! `output` modules; this module coordinates UI, logging flush and error
+//! reporting.
+
 use crate::output::{LogContext, log_output};
 use crate::utils::{Messages, clear_terminal, copy_incremental};
 use crossterm::terminal;
 use std::io::Write;
 use std::path::Path;
 
+/// Print the initial messages shown when a copy operation starts.
+///
+/// This clears the terminal and prints the localized "backup started" messages
+/// including source and destination paths. It uses the provided `LogContext`
+/// for formatting decisions (quiet / timestamps) but does not mutate it.
+///
+/// # Parameters
+/// - `msg`: localized messages bundle.
+/// - `ctx`: current log/output context.
+/// - `source`: source directory path.
+/// - `destination`: destination directory path.
 pub fn start_copy_message(msg: &Messages, ctx: &LogContext, source: &Path, destination: &Path) {
     clear_terminal();
 
@@ -21,7 +39,8 @@ pub fn start_copy_message(msg: &Messages, ctx: &LogContext, source: &Path, desti
     );
 }
 
-// Helper function: centralizza il flush del logger per evitare duplicazione
+// Helper function: centralize logger flush to avoid duplication
+// (kept private as internal utility)
 fn flush_logger(ctx: &mut LogContext) {
     if let Some(log) = &ctx.logger {
         match log.lock() {
@@ -36,6 +55,18 @@ fn flush_logger(ctx: &mut LogContext) {
     }
 }
 
+/// Run the incremental copy operation and print final messages.
+///
+/// This function sets up the progress row, calls the core `copy_incremental`
+/// helper and prints a summary or a fatal error message. On unrecoverable
+/// errors it attempts to flush the logger and exits the process.
+///
+/// # Parameters
+/// - `msg`: localized messages bundle.
+/// - `ctx`: mutable logging/context object; some fields (row, on_log) are
+///   updated during execution.
+/// - `source`: source directory path.
+/// - `destination`: destination directory path.
 pub fn execute_copy(msg: &Messages, ctx: &mut LogContext, source: &Path, destination: &Path) {
     let (_cols, rows) = terminal::size().unwrap_or((80, 24));
     let progress_row = rows.saturating_sub(1);

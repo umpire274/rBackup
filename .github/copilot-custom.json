@@ -1,0 +1,54 @@
+{
+  "version": 1,
+  "description": "Configuration hints for Copilot coding agents working on the rbackup repository.",
+  "preferred_language": "rust",
+  "project_type": "cli",
+  "build_instructions": {
+    "bootstrap": [
+      "rustup toolchain install stable",
+      "rustup component add rustfmt",
+      "rustup component add clippy"
+    ],
+    "build": "cargo build",
+    "format_check": "cargo fmt --all -- --check",
+    "clippy": "cargo clippy --all-targets --all-features -- -D warnings",
+    "test": "cargo test --all",
+    "release_build": "cargo build --release"
+  },
+  "key_paths": {
+    "root": ".",
+    "cargo_toml": "Cargo.toml",
+    "readme": "README.md",
+    "changelog": "CHANGELOG.md",
+    "main_rs": "src/main.rs",
+    "lib_rs": "src/lib.rs",
+    "cli": "src/cli.rs",
+    "commands": "src/commands.rs",
+    "copy": "src/copy.rs",
+    "utils": "src/utils.rs",
+    "output": "src/output.rs",
+    "tests_dir": "tests/",
+    "translations_tool": "scripts/translations_tool/",
+    "assets": "assets/"
+  },
+  "gitignore_samples": ["/target", "/*.log", "/*.txt", "*.bak", "tmp_bench/*"],
+  "pre_commit_checklist": [
+    "cargo fmt --all -- --check",
+    "cargo clippy --all-targets --all-features -- -D warnings",
+    "cargo test --all"
+  ],
+  "commit_message_conventions": ["feat:", "fix:", "chore:", "docs:"],
+  "notes": "Always prefer small, focused commits; update CHANGELOG.md and README.md only for user-visible changes. See .github/copilot-instructions.md for full onboarding notes.",
+  "agent_guidance": {
+    "trust_instructions_file": true,
+    "when_to_search": [
+      "If required details are not in this file or .github/copilot-instructions.md",
+      "If CI fails in a way not reproducible locally"
+    ],
+    "common_traps": [
+      "Remember to quote shell glob patterns that contain $ or special chars in zsh/bash (e.g. '$RECYCLE.BIN')",
+      "Exclude matcher lives in LogContext.exclude_matcher; avoid duplicating exclude pattern lists across functions"
+    ]
+  }
+}
+

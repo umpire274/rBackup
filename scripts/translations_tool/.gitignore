@@ -1,0 +1,4 @@
+target
+dist
+*.txt
+*.log

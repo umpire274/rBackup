@@ -1,6 +1,31 @@
+//! Command-line interface definitions for the `rbackup` binary.
+//!
+//! This module defines the clap-powered `Cli` parser and the `Commands` enum
+//! describing the supported subcommands and their options.
+
 use clap::{ArgAction, Parser, Subcommand};
 use std::path::PathBuf;
 
+/// Parsed command-line arguments for the `rbackup` binary.
+///
+/// Use `Cli::parse()` (provided by clap) to obtain a populated instance.
+///
+/// If no subcommand is provided the `command` field will be `None` and the
+/// caller can decide how to react (for example: print help and exit 0).
+///
+/// # Examples
+///
+/// ```rust,no_run
+/// use clap::Parser;
+/// use rbackup::cli::Cli;
+/// // Let clap parse arguments from the current process
+/// let cli = Cli::parse();
+/// match cli.command {
+///     Some(rbackup::cli::Commands::Copy { .. }) => println!("Copy command chosen"),
+///     Some(rbackup::cli::Commands::Config { .. }) => println!("Config command chosen"),
+///     None => println!("No subcommand provided"),
+/// }
+/// ```
 #[derive(Debug, Parser)]
 #[command(
     name = "rbackup",
@@ -10,15 +35,24 @@ use std::path::PathBuf;
     long_about = "rbackup: a Rust-based backup tool that copies only new or modified files from a source to a destination directory. Supports multithreading, language localization, logging, and progress display."
 )]
 pub struct Cli {
+    /// Selected subcommand and its options. Optional to allow showing help
+    /// without Clap treating the absence of a subcommand as an error.
     #[command(subcommand)]
-    pub command: Commands,
+    pub command: Option<Commands>,
 }
 
+/// Available subcommands for `rbackup`.
+///
+/// Each variant contains the options relevant to that operation.
 #[derive(Debug, Subcommand)]
 pub enum Commands {
     /// Perform an incremental backup
     Copy {
         /// Source directory to backup
+        ///
+        /// This is interpreted as a filesystem path. The program will traverse
+        /// the directory recursively and copy new or modified files to the
+        /// destination.
         source: PathBuf,
 
         /// Destination directory
@@ -51,6 +85,15 @@ pub enum Commands {
         /// Do a dry-run (don't actually copy files)
         #[arg(long = "dry-run", action = ArgAction::SetTrue, help = "Perform a dry-run without copying files")]
         dry_run: bool,
+
+        /// Number of worker threads to use for parallel copy (optional)
+        #[arg(
+            short = 'j',
+            long = "jobs",
+            value_name = "N",
+            help = "Number of worker threads to use (overrides automatic choice)"
+        )]
+        jobs: Option<usize>,
     },
 
     /// Manage the configuration file (view or edit)
@@ -69,6 +112,10 @@ pub enum Commands {
             help = "Edit the configuration file (default editor: $EDITOR, or nano/vim/notepad)"
         )]
         edit_config: bool,
+
+        /// Upgrade the existing configuration file by inserting new fields if missing
+        #[arg(long = "upgrade", help = "Insert new config options into existing rbackup.conf when missing", action = ArgAction::SetTrue)]
+        upgrade_config: bool,
 
         /// Specify the editor to use (overrides $EDITOR/$VISUAL).
         /// Common choices: vim, nano.

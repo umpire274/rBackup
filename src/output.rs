@@ -1,3 +1,10 @@
+//! Output and logging utilities.
+//!
+//! This module centralizes terminal and file logging logic. The `LogContext`
+//! struct carries per-run options such as timestamp formatting, quiet mode and
+//! an optional file logger. The `log_output` function performs the combined
+//! terminal and file write.
+
 use crate::utils::Logger;
 use crossterm::style::ResetColor;
 use crossterm::{
@@ -8,6 +15,12 @@ use crossterm::{
 };
 use std::io::{Write, stdout};
 
+/// Context used for logging and terminal output.
+///
+/// The `LogContext` carries information about whether to print timestamps,
+/// whether to suppress terminal output, the optional file logger, and other
+/// runtime flags. It is intentionally clonable to simplify passing it across
+/// threads or components.
 #[derive(Debug, Clone)]
 pub struct LogContext {
     pub logger: Option<Logger>,
@@ -33,10 +46,34 @@ pub struct LogContext {
 
 const DEFAULT_TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
+/// Return current local time formatted with the given `strftime`-style format.
+///
+/// This is a small helper used by the logger to prepend timestamps to lines.
+///
+/// # Example
+///
+/// ```rust
+/// let s = rbackup::output::now("%Y-%m-%d");
+/// println!("today = {}", s);
+/// ```
 pub fn now(fmt: &str) -> String {
     chrono::Local::now().format(fmt).to_string()
 }
 
+/// Write a message to stdout and optionally to the configured file logger.
+///
+/// This function respects the `LogContext` flags:
+/// - `quiet` disables terminal output
+/// - `with_timestamp` (and `timestamp_format`) control the prepended timestamp
+/// - `row` controls whether the message is printed at a specific terminal row
+/// - `on_log` enables writing to the file logger (if present)
+///
+/// The function attempts to handle poisoned mutexes on the logger and will
+/// still proceed to write to the terminal when possible.
+///
+/// # Parameters
+/// - `msg`: message text to write (may contain newlines)
+/// - `ctx`: logging context describing where/how to write
 pub fn log_output(msg: &str, ctx: &LogContext) {
     let ts = if ctx.with_timestamp && !msg.trim().is_empty() {
         let fmt = ctx
@@ -50,7 +87,7 @@ pub fn log_output(msg: &str, ctx: &LogContext) {
 
     let full_msg = format!("{}{}", ts, msg);
 
-    // Output su terminale
+    // Terminal output
     if !ctx.quiet {
         if let Some(row) = ctx.row {
             let _ = execute!(
@@ -65,7 +102,7 @@ pub fn log_output(msg: &str, ctx: &LogContext) {
         }
     }
 
-    // Output su file di log (solo se presente)
+    // File logger output (if present and enabled)
     if let Some(file) = &ctx.logger
         && ctx.on_log
     {
