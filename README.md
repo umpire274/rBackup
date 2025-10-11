@@ -4,10 +4,10 @@
 backups of directories. It is inspired by tools like `rsync` and `robocopy`, but designed with simplicity, portability,
 and localization in mind.
 
-![CI](https://github.com/umpire274/rbackup/actions/workflows/ci.yml/badge.svg)
-[![Licenza MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+[![Build Status](https://github.com/umpire274/rBackup/actions/workflows/ci.yml/badge.svg)](https://github.com/umpire274/rBackup/actions/workflows/ci.yml)
+[[![Latest Release](https://img.shields.io/github/v/release/umpire274/rBackup)](https://github.com/umpire274/rBackup/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 [![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS%20Intel%20%7C%20macOS%20Apple%20Silicon-blue)](https://github.com/umpire274/rBackup/releases)
-[![Versione](https://img.shields.io/badge/version-0.5.1-orange)](https://github.com/umpire274/rbackup/releases)
 
 📋 [View recent changes (Changelog)](CHANGELOG.md)
 
