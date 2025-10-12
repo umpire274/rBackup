@@ -44,7 +44,7 @@ paru -S rfortune
 [![Homebrew](https://img.shields.io/badge/Homebrew-rBackup-orange.svg?logo=homebrew)](https://github.com/umpire274/homebrew-tap)
 
 ```bash
-brew tap umpire274/rbackup
+brew tap umpire274/tap
 brew install rbackup
 ```
 
