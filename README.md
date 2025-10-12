@@ -41,7 +41,7 @@ paru -S rfortune
 
 ### 🍺 Homebrew (macOS/Linux)
 
-[![Homebrew Tap](https://img.shields.io/badge/homebrew-tap-brightgreen)](https://github.com/umpire274/homebrew-rbackup)
+[![Homebrew](https://img.shields.io/badge/Homebrew-rBackup-orange.svg?logo=homebrew)](https://github.com/umpire274/homebrew-tap)
 
 ```bash
 brew tap umpire274/rbackup
