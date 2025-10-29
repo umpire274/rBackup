@@ -29,7 +29,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
+
       - name: Extract version (Unix/Win)
         id: ver
         shell: bash
@@ -37,7 +37,7 @@ jobs:
           VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d '"' -f2)
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-      
+
       - name: Cache cargo / target
         uses: actions/cache@v4
         with:
@@ -46,13 +46,23 @@ jobs:
             ~/.cargo/git
             target
           key: ${{ runner.os }}-cargo-${{ matrix.target }}-${{ hashFiles('**/Cargo.lock') }}
-      
+
       - name: Install Rust target
         run: rustup target add ${{ matrix.target }}
-      
+
+      - name: Build (with icon embedding on Windows)
+        shell: bash
+        run: |
+          if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
+            rustup default stable-x86_64-pc-windows-msvc
+            cargo build --release --target ${{ matrix.target }}
+          else
+            cargo build --release --target ${{ matrix.target }}
+          fi
+
       - name: Build
         run: cargo build --release --target ${{ matrix.target }}
-      
+
       - name: Package
         shell: bash
         run: |
@@ -69,7 +79,7 @@ jobs:
             tar -czf rbackup-${VERSION}-${{ matrix.target }}.tar.gz rbackup-${{ matrix.target }}
             cp rbackup-${VERSION}-${{ matrix.target }}.tar.gz $GITHUB_WORKSPACE/release_artifacts/${{ matrix.target }}/
           fi
-      
+
       - name: Upload artifact (lnx/win)
         uses: actions/upload-artifact@v4
         with:
@@ -84,7 +94,7 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-      
+
       - name: Extract version
         id: ver
         shell: bash
@@ -92,7 +102,7 @@ jobs:
           VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d '"' -f2)
           echo "VERSION=$VERSION" >> "$GITHUB_ENV"
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
-      
+
       - name: Cache cargo / target
         uses: actions/cache@v4
         with:
@@ -101,15 +111,15 @@ jobs:
             ~/.cargo/git
             target
           key: macos-cargo-dual-${{ hashFiles('**/Cargo.lock') }}
-      
+
       - name: Install Rust targets (x86_64 + aarch64)
         run: |
           rustup target add x86_64-apple-darwin
           rustup target add aarch64-apple-darwin
-      
+
       - name: Build x86_64
         run: cargo build --release --target x86_64-apple-darwin
-      
+
       - name: Package x86_64
         shell: bash
         run: |
@@ -120,10 +130,10 @@ jobs:
           cp $GITHUB_WORKSPACE/{README.md,LICENSE,CHANGELOG.md} rbackup-x86_64-apple-darwin/
           tar -czf rbackup-${VERSION}-x86_64-apple-darwin.tar.gz rbackup-x86_64-apple-darwin
           cp rbackup-${VERSION}-x86_64-apple-darwin.tar.gz $GITHUB_WORKSPACE/release_artifacts/x86_64-apple-darwin/
-      
+
       - name: Build aarch64
         run: cargo build --release --target aarch64-apple-darwin
-      
+
       - name: Package aarch64
         shell: bash
         run: |
@@ -134,7 +144,7 @@ jobs:
           cp $GITHUB_WORKSPACE/{README.md,LICENSE,CHANGELOG.md} rbackup-aarch64-apple-darwin/
           tar -czf rbackup-${VERSION}-aarch64-apple-darwin.tar.gz rbackup-aarch64-apple-darwin
           cp rbackup-${VERSION}-aarch64-apple-darwin.tar.gz $GITHUB_WORKSPACE/release_artifacts/aarch64-apple-darwin/
-      
+
       - name: Upload artifacts (macOS)
         uses: actions/upload-artifact@v4
         with:
@@ -154,7 +164,7 @@ jobs:
           pattern: release_artifacts-*
           path: temp_download
           merge-multiple: true
-      
+
       - name: Combine into single folder
         shell: bash
         run: |
@@ -174,20 +184,20 @@ jobs:
     steps:
       - name: Checkout (for Cargo.toml/CHANGELOG)
         uses: actions/checkout@v4
-      
+
       - name: Download consolidated
         uses: actions/download-artifact@v4
         with:
           name: release_artifacts
           path: release_artifacts
-      
+
       - name: Extract version
         id: extract_version
         run: |
           VERSION=$(grep '^version' Cargo.toml | head -n1 | cut -d '"' -f2)
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "VERSION=$VERSION" >> $GITHUB_ENV
-      
+
       - name: Generate SHA256 for all files
         shell: bash
         run: |
@@ -197,7 +207,7 @@ jobs:
             [[ -f "$f" ]] || continue
             sha256sum "$f" > "$f.sha256" || shasum -a 256 "$f" > "$f.sha256"
           done
-      
+
       - name: Import GPG key
         shell: bash
         run: |
@@ -207,7 +217,7 @@ jobs:
           echo "$GPG_PRIVATE_KEY" | base64 --decode | gpg --batch --import
         env:
           GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
-      
+
       - name: Sign all artifacts (detach .sig)
         shell: bash
         run: |
@@ -220,7 +230,7 @@ jobs:
           done
         env:
           GPG_PASSPHRASE: ${{ secrets.GPG_PASSPHRASE }}
-      
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
