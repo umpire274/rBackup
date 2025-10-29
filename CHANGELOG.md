@@ -4,21 +4,44 @@
 
 All notable changes to the `rbackup` project will be documented in this file.
 
+## [0.6.1] - 2025-10-27
+
+### Added
+
+- Introduced new application icon (`assets/rbackup.ico`) for Windows builds.
+    - The icon is now automatically embedded into the executable using the `winresource` build dependency.
+    - Provides a consistent visual identity in Windows Explorer and the taskbar.
+
+### Changed
+
+- Build process updated to include the new embedded icon during `cargo build --release`.
+
+### Notes
+
+- The `.ico` file resides under the `assets/` directory together with other project resources.
+- No functional or CLI changes — this release is a visual enhancement only.
+
 ---
 
 ## [v0.6.0] - 2025-10-11
 
 ### 🚀 Highlights
 
-- Added a dedicated Copilot onboarding file (`.github/copilot-instructions.md`) to speed up automated code agents and reduce PR churn.
-- Further enhanced `--exclude` behavior and documentation (see README) with clearer examples, zsh/bsh quoting tips and use-cases.
-- Improved translations workflow and added `scripts/translations_tool` features: template generation, apply with backup and consistency checks.
-- CI/workflows improvements and permissions fixes; ensured `rustfmt` and `clippy` are run in the lint job and release workflow extracts version from `Cargo.toml`.
+- Added a dedicated Copilot onboarding file (`.github/copilot-instructions.md`) to speed up automated code agents and
+  reduce PR churn.
+- Further enhanced `--exclude` behavior and documentation (see README) with clearer examples, zsh/bsh quoting tips and
+  use-cases.
+- Improved translations workflow and added `scripts/translations_tool` features: template generation, apply with backup
+  and consistency checks.
+- CI/workflows improvements and permissions fixes; ensured `rustfmt` and `clippy` are run in the lint job and release
+  workflow extracts version from `Cargo.toml`.
 
 ### 🧾 Logging & UX
 
-- Ensured skipped files are reported both to console (UI) and to the log file when `--log` is used. Log lines include the exclude pattern that caused a skip when applicable.
-- UI output serialisation to avoid progress-bar overwrite; introduced a single-threaded UI writer and a scroll buffer for per-file messages.
+- Ensured skipped files are reported both to console (UI) and to the log file when `--log` is used. Log lines include
+  the exclude pattern that caused a skip when applicable.
+- UI output serialisation to avoid progress-bar overwrite; introduced a single-threaded UI writer and a scroll buffer
+  for per-file messages.
 
 ### 🔧 Fixes & Maintenance
 
@@ -27,10 +50,12 @@ All notable changes to the `rbackup` project will be documented in this file.
 
 ### 📝 Documentation
 
-- Added comprehensive English API documentation across `src/` (docstrings and translated comments), converting existing Italian comments to English.
+- Added comprehensive English API documentation across `src/` (docstrings and translated comments), converting existing
+  Italian comments to English.
 - Added usage examples / small usage cases for common functions (e.g. `copy_incremental`, `build_exclude_matcher`).
 - Created `assets/TRANSLATIONS.md` describing translation keys, placeholder usage, and how to add new languages.
-- Added a translations consistency test: `tests/translations_consistency.rs` to ensure all language entries share the same set of keys.
+- Added a translations consistency test: `tests/translations_consistency.rs` to ensure all language entries share the
+  same set of keys.
 - Added concrete use-case examples to `README.md` (CLI copy/config examples and translations tool workflow).
 - No functional changes: documentation and tests only.
 - Validation: ran `cargo check` and `cargo test` locally; all tests passed.
@@ -41,7 +66,8 @@ All notable changes to the `rbackup` project will be documented in this file.
 
 ### 🔧 Change
 
-- Updated the end-of-copy message to include the total number of files processed (copied + skipped) in addition to the separate counts for copied and skipped files. This helps quickly see the overall scope of the operation.
+- Updated the end-of-copy message to include the total number of files processed (copied + skipped) in addition to the
+  separate counts for copied and skipped files. This helps quickly see the overall scope of the operation.
 
 ---
 

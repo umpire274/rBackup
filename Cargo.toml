@@ -1,6 +1,6 @@
 [package]
 name = "rbackup"
-version = "0.6.0"
+version = "0.6.1"
 edition = "2024"
 license = "MIT"
 description = "Incremental, cross-platform and multithreaded backup tool written in Rust"
@@ -9,17 +9,45 @@ homepage = "https://github.com/umpire274/rbackup"
 repository = "https://github.com/umpire274/rbackup"
 keywords = ["backup", "cli", "rsync", "robocopy", "multiplatform"]
 categories = ["command-line-utilities", "filesystem"]
-exclude = ["/dist/*", "/temp_build/*"]
+exclude = [
+    "target/*",
+    ".idea/*",
+    ".github/*",
+    ".gitignore",
+    "config/*",
+    "*.sh",
+    "*.bat",
+    "/dist/*",
+    "/temp_build/*"
+]
+include = [
+    "src/**/*",
+    "Cargo.toml",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md"
+]
+
+[build-dependencies]
+winresource = "0.1.23"
+
+[package.metadata.winresource]
+Icon = "assets/rbackup.ico"
+
+[package.metadata.bundle]
+name = "rBackup"
+identifier = "eu.umpire274.rbackup"
+icon = ["assets/rbackup.png"]
 
 [dependencies]
-clap = { version = "4.5.48", features = ["derive"] }
+clap = { version = "4.5.50", features = ["derive"] }
 crossterm = "0.29.0"
 walkdir = "2.5.0"
 serde = { version = "1.0.228", features = ["derive"] }
 serde_json = "1.0.145"
 chrono = "0.4.42"
 sys-locale = "0.3.2"
-globset = "0.4.16"
+globset = "0.4.18"
 serde_yaml = "0.9.33"
 rayon = "1.11.0"
 unicode-width = "0.2.2"
