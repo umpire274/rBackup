@@ -5,23 +5,23 @@ use std::path::Path;
 fn main() {
     use winresource::WindowsResource;
 
-    // Percorso all'icona (modifica se necessario)
+    // Path to the icon (edit if necessary)
     let icon_path = "assets/rbackup.ico";
 
-    // Verifica che il file esista
+    // Check if the file exists
     assert!(
         Path::new(icon_path).exists(),
         "Icon file not found at {}",
         icon_path
     );
 
-    // Inizializza risorsa Windows
+    // Initialize Windows resource
     let mut res = WindowsResource::new();
 
-    // Imposta l'icona principale
+    // Set the main icon
     res.set_icon(icon_path);
 
-    // Metadati principali (le versioni vengono lette da Cargo.toml)
+    // Main metadata (versions are read from Cargo.toml)
     let version = env!("CARGO_PKG_VERSION");
     res.set("FileDescription", "rBackup - Incremental Backup Utility");
     res.set("ProductName", "rBackup");
@@ -30,17 +30,17 @@ fn main() {
     res.set("ProductVersion", version);
     res.set("LegalCopyright", "© 2025 Alessandro Maestri");
 
-    // (Opzionale) se vuoi integrare un file .rc aggiuntivo
+    // (Optional) if you want to integrate an additional .rc file
     // res.set_manifest_file("assets/rbackup.rc");
 
-    // Compila le risorse
+    // Compile the resources
     res.compile().expect("Failed to embed Windows resources");
 
-    // Forza la ricompilazione se cambia l’icona
+    // Force recompile if icon changes
     println!("cargo:rerun-if-changed={}", icon_path);
 }
 
 #[cfg(not(target_os = "windows"))]
 fn main() {
-    // Niente da fare su Linux/macOS
+    // Nothing to do on Linux/macOS
 }
