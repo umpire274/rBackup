@@ -5,8 +5,10 @@ use std::path::Path;
 fn main() {
     use winresource::WindowsResource;
 
-    // Path to the icon (edit if necessary)
+    // Path to the icon file
     let icon_path = "assets/rbackup.ico";
+    // Path to the resource script
+    let rc_path = "assets/rbackup.rc";
 
     // Check if the file exists
     assert!(
@@ -14,11 +16,20 @@ fn main() {
         "Icon file not found at {}",
         icon_path
     );
+    // Check if the resource script exists
+    assert!(
+        Path::new(rc_path).exists(),
+        "Resource script not found at {}",
+        rc_path
+    );
 
     // Initialize Windows resource
     let mut res = WindowsResource::new();
 
-    // Set the main icon
+    // Specify the .rc file to compile
+    res.set_resource_file(rc_path);
+
+    // Set the icon
     res.set_icon(icon_path);
 
     // Main metadata (versions are read from Cargo.toml)
@@ -30,14 +41,12 @@ fn main() {
     res.set("ProductVersion", version);
     res.set("LegalCopyright", "© 2025 Alessandro Maestri");
 
-    // (Optional) if you want to integrate an additional .rc file
-    // res.set_manifest_file("assets/rbackup.rc");
-
     // Compile the resources
     res.compile().expect("Failed to embed Windows resources");
 
-    // Force recompile if icon changes
+    // 🪶 Trigger for automatic rebuild
     println!("cargo:rerun-if-changed={}", icon_path);
+    println!("cargo:rerun-if-changed={}", rc_path);
 }
 
 #[cfg(not(target_os = "windows"))]
