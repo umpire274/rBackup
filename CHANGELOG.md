@@ -21,6 +21,12 @@ All notable changes to the `rbackup` project will be documented in this file.
 - The `.ico` file resides under the `assets/` directory together with other project resources.
 - No functional or CLI changes — this release is a visual enhancement only.
 
+### Documentation
+
+- Added a new section in `README.md` titled **“Maintainers: Manual Release Trigger”**,
+  describing how to manually rebuild or recreate a release from GitHub Actions.
+  Includes CLI usage (`gh workflow run`) and bilingual inline comments for maintainers.
+
 ---
 
 ## [v0.6.0] - 2025-10-11

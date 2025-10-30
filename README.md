@@ -98,11 +98,13 @@ Global options (applicable to all commands)
 
 ## 📌 Commands
 
-Below are the top-level commands with the most relevant options and quick usage notes for each. This layout is easier to scan than a dense table when commands have many options.
+Below are the top-level commands with the most relevant options and quick usage notes for each. This layout is easier to
+scan than a dense table when commands have many options.
 
 ### copy
 
-Description: Perform an incremental backup from a `source` directory to a `destination` directory. Only new or modified files are copied.
+Description: Perform an incremental backup from a `source` directory to a `destination` directory. Only new or modified
+files are copied.
 
 Usage:
 
@@ -336,6 +338,35 @@ cargo build --release
 ```
 
 For Windows, rbackup.rc will be embedded automatically in the executable.
+
+---
+
+## 🧭 Maintainers: Manual Release Trigger
+
+If you need to manually build and publish a new release (or rebuild an existing one),  
+you can trigger the **“Build, Package and Release”** workflow directly from GitHub Actions.
+
+### 🔹 Standard release (safe)
+
+1. Go to **Actions → Build, Package and Release**
+2. Click **Run workflow**
+3. Leave `force_replace` = `false`
+4. Confirm → the workflow will only create the release if it does not already exist.
+
+### 🔹 Force rebuild of an existing release
+
+1. Open the same workflow in **Actions**
+2. Click **Run workflow**
+3. Set `force_replace` = `true`
+4. Confirm → the workflow will delete the existing GitHub release and tag, then recreate them with the latest artifacts.
+
+> 💡 For command-line users: you can also trigger this manually via GitHub CLI:
+> ```bash
+> gh workflow run "Build, Package and Release" -f force_replace=true
+> ```
+
+This ensures you can safely regenerate signed release packages when needed,  
+without affecting your normal automated release process.
 
 ---
 

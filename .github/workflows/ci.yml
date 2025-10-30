@@ -5,6 +5,14 @@ on:
     workflows: [ "Rust Build & Test" ]
     types: [ completed ]
 
+  # Optional manual trigger to force delete an existing release/tag
+  workflow_dispatch:
+    inputs:
+      force_replace:
+        description: "Force delete existing release and tag before re-creating"
+        required: false
+        default: "false"
+
 permissions:
   contents: write
 
@@ -14,7 +22,6 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
-      max-parallel: 2
       matrix:
         include:
           - os: ubuntu-latest
@@ -25,12 +32,12 @@ jobs:
             target: x86_64-pc-windows-msvc
             ext: zip
             bin: rbackup.exe
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Extract version (Unix/Win)
+      - name: Extract version
         id: ver
         shell: bash
         run: |
@@ -50,18 +57,13 @@ jobs:
       - name: Install Rust target
         run: rustup target add ${{ matrix.target }}
 
-      - name: Build (with icon embedding on Windows)
+      - name: Build
         shell: bash
         run: |
           if [[ "${{ matrix.os }}" == "windows-latest" ]]; then
             rustup default stable-x86_64-pc-windows-msvc
-            cargo build --release --target ${{ matrix.target }}
-          else
-            cargo build --release --target ${{ matrix.target }}
           fi
-
-      - name: Build
-        run: cargo build --release --target ${{ matrix.target }}
+          cargo build --release --target ${{ matrix.target }}
 
       - name: Package
         shell: bash
@@ -85,12 +87,12 @@ jobs:
         with:
           name: release_artifacts-${{ matrix.target }}
           path: release_artifacts/${{ matrix.target }}
-  
+
   build_macos_dual:
     if: ${{ github.event.workflow_run.conclusion == 'success' && github.event.workflow_run.head_branch == 'main' }}
     runs-on: macos-14
     timeout-minutes: 60
-    
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -152,7 +154,7 @@ jobs:
           path: |
             release_artifacts/x86_64-apple-darwin
             release_artifacts/aarch64-apple-darwin
-  
+
   consolidate:
     name: Consolidate Artifacts
     needs: [ build_lnx_win, build_macos_dual ]
@@ -176,16 +178,16 @@ jobs:
         with:
           name: release_artifacts
           path: release_artifacts
-  
+
   release:
     name: Create GitHub Release (sign on Linux)
     needs: consolidate
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout (for Cargo.toml/CHANGELOG)
+      - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download consolidated
+      - name: Download consolidated artifacts
         uses: actions/download-artifact@v4
         with:
           name: release_artifacts
@@ -198,11 +200,21 @@ jobs:
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "VERSION=$VERSION" >> $GITHUB_ENV
 
+      # Optional step: delete existing release/tag only if requested manually
+      - name: Delete existing release and tag (optional)
+        if: ${{ github.event.inputs.force_replace == 'true' }}
+        run: |
+          TAG="v${{ steps.extract_version.outputs.version }}"
+          echo "Checking for existing release/tag: $TAG"
+          gh release view "$TAG" --json id && gh release delete "$TAG" --yes || echo "No existing release."
+          git push origin ":refs/tags/$TAG" || echo "No existing tag."
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
       - name: Generate SHA256 for all files
         shell: bash
         run: |
           cd release_artifacts
-          # genera un file SHA256 per ogni artefatto singolarmente:
           for f in rbackup-*.*; do
             [[ -f "$f" ]] || continue
             sha256sum "$f" > "$f.sha256" || shasum -a 256 "$f" > "$f.sha256"
@@ -244,4 +256,3 @@ jobs:
             release_artifacts/rbackup-*.sha256
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
