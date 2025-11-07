@@ -37,9 +37,9 @@ and localization in mind.
 [![AUR](https://img.shields.io/aur/version/rbackup)](https://aur.archlinux.org/packages/rbackup)
 
 ```bash
-yay -S rfortune
+yay -S rbackup
 # or
-paru -S rfortune
+paru -S rbackup
 ```
 
 ### 🍺 Homebrew (macOS/Linux)
@@ -76,7 +76,7 @@ rbackup <source> <destination> [OPTIONS]
 ## ✅ Basic example
 
 ```sh
-rbackup ~/Documents /mnt/backup_drive/Documents
+rbackup copy ~/Documents /mnt/backup_drive/Documents
 ```
 
 ---
@@ -249,19 +249,19 @@ development.
 - Basic backup:
 
 ```bash
-rbackup C:\Users\alice\Documents D:\Backups\alice\Documents
+rbackup copy C:\Users\alice\Documents D:\Backups\alice\Documents
 ```
 
 - Backup with logging, timestamps and quiet off:
 
 ```bash
-rbackup C:\source\folder D:\backup\folder --log backup.log --timestamp
+rbackup copy C:\source\folder D:\backup\folder --log backup.log --timestamp
 ```
 
 - Dry-run to debug excludes and generate a report (Windows `cmd.exe`):
 
 ```bat
-rbackup C:\source D:\dest --exclude "*.tmp" --dry-run --log dryrun.log
+rbackup copy C:\source D:\dest --exclude "*.tmp" --dry-run --log dryrun.log
 ```
 
 ### 2) Manage configuration
@@ -324,7 +324,7 @@ Notes:
 ## 📝 Example
 
 ```sh
-rbackup /home/alex/Projects /mnt/usb-backup --log backup.log --timestamp
+rbackup copy /home/alex/Projects /mnt/usb-backup --log backup.log --timestamp
 ```
 
 ## 🧪 Build from source
