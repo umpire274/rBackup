@@ -1,5 +1,8 @@
 name: AUR packaging (rbackup)
 
+permissions:
+  contents: read
+
 on:
   workflow_dispatch:
 
