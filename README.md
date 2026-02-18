@@ -1,5 +1,5 @@
 <h1 style="text-align: left;">
-  <img src="assets/rbackup.svg" width="90" style="vertical-align: middle; margin-right: 8px;" alt="rBackup Logo"/>
+  <img src="res/rbackup.svg" width="90" style="vertical-align: middle; margin-right: 8px;" alt="rBackup Logo"/>
   rBackup
 </h1>
 

@@ -20,32 +20,26 @@ exclude = [
     "/dist/*",
     "/temp_build/*"
 ]
-include = [
-    "src/**/*",
-    "Cargo.toml",
-    "README.md",
-    "LICENSE",
-    "CHANGELOG.md"
-]
+build = "build.rs"
 
 [build-dependencies]
-winresource = "0.1.23"
+winresource = "0.1.26"
 
 [package.metadata.winresource]
-Icon = "assets/rbackup.ico"
+Icon = "res/rbackup.ico"
 
 [package.metadata.bundle]
 name = "rBackup"
 identifier = "eu.umpire274.rbackup"
-icon = ["assets/rbackup.png"]
+icon = ["res/rbackup.png"]
 
 [dependencies]
-clap = { version = "4.5.50", features = ["derive"] }
+clap = { version = "4.5.59", features = ["derive"] }
 crossterm = "0.29.0"
 walkdir = "2.5.0"
 serde = { version = "1.0.228", features = ["derive"] }
-serde_json = "1.0.145"
-chrono = "0.4.42"
+serde_json = "1.0.149"
+chrono = "0.4.43"
 sys-locale = "0.3.2"
 globset = "0.4.18"
 serde_yaml = "0.9.33"
@@ -53,5 +47,8 @@ rayon = "1.11.0"
 unicode-width = "0.2.2"
 
 [dev-dependencies]
-tempfile = "3.23.0"
-filetime = "0.2.26"
+tempfile = "3.25.0"
+filetime = "0.2.27"
+
+[profile.release]
+opt-level = 3
