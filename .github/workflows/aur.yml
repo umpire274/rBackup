@@ -1,0 +1,78 @@
+name: AUR packaging (rbackup)
+
+permissions:
+  contents: read
+
+on:
+  workflow_dispatch:
+
+jobs:
+  aur:
+    runs-on: ubuntu-latest
+    container:
+      image: archlinux:base-devel
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Init pacman
+        run: |
+          set -euxo pipefail
+          pacman -Sy --noconfirm
+          pacman -S --noconfirm git sudo fakeroot binutils
+
+      - name: Prepare build user
+        run: |
+          set -euxo pipefail
+          useradd -m builder
+          passwd -d builder
+          echo "builder ALL=(ALL) NOPASSWD: ALL" >> /etc/sudoers
+
+      - name: Write PKGBUILD
+        shell: bash
+        run: |
+          set -euxo pipefail
+
+          WORKDIR="$GITHUB_WORKSPACE/aur/rbackup"
+          mkdir -p "$WORKDIR"
+
+          cat > "$WORKDIR/PKGBUILD" <<'EOF'
+          pkgname=rbackup
+          pkgver=0.6.1
+          pkgrel=1
+          pkgdesc="Fast incremental backup tool written in Rust"
+          arch=("x86_64")
+          url="https://github.com/umpire274/rbackup"
+          license=("MIT")
+          
+          source=(
+            "rbackup-${pkgver}-x86_64-unknown-linux-gnu.tar.gz::https://github.com/umpire274/rbackup/releases/download/v${pkgver}/rbackup-${pkgver}-x86_64-unknown-linux-gnu.tar.gz"
+          )
+          
+          sha256sums=(
+            "f253bbec68fd3fe9f9531dac22a500639094c6847a65d8640bb89c7605dbb3ce"
+          )
+          
+          package() {
+            install -Dm755 rbackup "${pkgdir}/usr/bin/rbackup"
+            install -Dm644 LICENSE "${pkgdir}/usr/share/licenses/rbackup/LICENSE"
+            install -Dm644 README.md "${pkgdir}/usr/share/doc/rbackup/README.md"
+            install -Dm644 CHANGELOG.md "${pkgdir}/usr/share/doc/rbackup/CHANGELOG.md"
+          }
+          EOF
+
+      - name: Generate SRCINFO
+        run: |
+          set -euxo pipefail
+
+          WORKDIR="$GITHUB_WORKSPACE/aur/rbackup"
+          chown -R builder:builder "$WORKDIR"
+
+          su - builder -c "cd '$WORKDIR' && makepkg --printsrcinfo --nodeps > SRCINFO.txt"
+
+      - name: Upload SRCINFO artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: rbackup-srcinfo
+          path: aur/rbackup/SRCINFO.txt
