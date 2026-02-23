@@ -70,18 +70,15 @@ fn test_copy_incremental_integration() {
     let matcher = build_exclude_matcher(&["skip.txt".to_string()], false).unwrap();
 
     let ctx = LogContext {
-        logger: None,
         quiet: true,
-        with_timestamp: false,
         timestamp_format: Some("%Y-%m-%d".into()),
         row: Some(1),
         on_log: false,
-        exclude_match_absolute: false,
-        dry_run: false,
         exclude_matcher: Some(matcher),
-        exclude_patterns: None,
+        ..Default::default()
     };
-    let (copied, skipped) = copy_incremental(src_dir.path(), dst_dir.path(), &msg, &ctx).unwrap();
+    let (copied, skipped) =
+        copy_incremental(src_dir.path(), dst_dir.path(), &msg, &ctx, false).unwrap();
 
     assert_eq!(copied, 1);
     assert_eq!(skipped, 1);
@@ -123,19 +120,16 @@ fn test_copy_incremental_dry_run() {
     };
 
     let ctx = LogContext {
-        logger: None,
         quiet: true,
-        with_timestamp: false,
         timestamp_format: Some("%Y-%m-%d".into()),
         row: Some(1),
         on_log: false,
-        exclude_match_absolute: false,
         dry_run: true,
-        exclude_matcher: None,
-        exclude_patterns: None,
+        ..Default::default()
     };
 
-    let (copied, skipped) = copy_incremental(src_dir.path(), dst_dir.path(), &msg, &ctx).unwrap();
+    let (copied, skipped) =
+        copy_incremental(src_dir.path(), dst_dir.path(), &msg, &ctx, false).unwrap();
 
     assert_eq!(copied, 1);
     assert_eq!(skipped, 0);

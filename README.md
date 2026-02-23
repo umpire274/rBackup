@@ -122,6 +122,7 @@ Important options:
 - `--absolute-exclude` — match exclude patterns against absolute source paths
 - `--ignore-case` — perform case-insensitive matching for exclude patterns
 - `--dry-run` — perform a dry-run without copying files
+- `--show-skipped <never|summary|all>` — control whether skipped items are printed during the run (default: `summary`)
 
 Example:
 

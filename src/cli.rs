@@ -3,8 +3,19 @@
 //! This module defines the clap-powered `Cli` parser and the `Commands` enum
 //! describing the supported subcommands and their options.
 
-use clap::{ArgAction, Parser, Subcommand};
+use clap::{ArgAction, Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
+
+/// Control whether skipped items are printed during the copy.
+#[derive(Debug, Clone, Copy, ValueEnum)]
+pub enum ShowSkippedArg {
+    /// Never print skipped items.
+    Never,
+    /// Do not print skipped items during the run (only show the final summary).
+    Summary,
+    /// Print both copied and skipped items.
+    All,
+}
 
 /// Parsed command-line arguments for the `rbackup` binary.
 ///
@@ -58,6 +69,10 @@ pub enum Commands {
         /// Destination directory
         destination: PathBuf,
 
+        /// Copy only changed/new items (delta mode). When enabled, skipped items are hidden by default.
+        #[arg(short = 'd', long = "delta", action = ArgAction::SetTrue)]
+        delta: bool,
+
         /// Suppress all output to stdout
         #[arg(short, long, action = ArgAction::SetTrue)]
         quiet: bool,
@@ -94,6 +109,14 @@ pub enum Commands {
             help = "Number of worker threads to use (overrides automatic choice)"
         )]
         jobs: Option<usize>,
+
+        /// Control whether skipped files are printed while copying
+        #[arg(
+            long = "show-skipped",
+            value_enum,
+            help = "(Advanced) Display skipped items: never, summary, or all (overrides --delta default)"
+        )]
+        show_skipped: Option<ShowSkippedArg>,
     },
 
     /// Manage the configuration file (view or edit)

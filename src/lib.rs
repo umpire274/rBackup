@@ -20,7 +20,7 @@ pub mod ui;
 pub mod utils;
 
 // Re-exports
-pub use output::LogContext;
+pub use output::{LogContext, ShowSkipped};
 
 /// Thread-safe file logger type: `Arc<Mutex<BufWriter<File>>>`.
 pub use utils::{Logger, Messages, build_exclude_matcher, copy_incremental, is_newer};
