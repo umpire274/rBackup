@@ -5,13 +5,12 @@
 //! copying implementation. Public items are documented with examples where
 //! relevant.
 
-use crate::output::LogContext;
+use crate::output::{LogContext, ShowSkipped};
 use crossterm::execute;
 use crossterm::terminal::{Clear, ClearType};
 use globset::{Glob, GlobBuilder, GlobSet, GlobSetBuilder};
 use rayon::prelude::*; // parallel iterator utilities
 use serde::Deserialize;
-use std::collections::VecDeque;
 use std::io::{BufWriter, Write, stdout};
 use std::sync::mpsc;
 use std::thread;
@@ -22,7 +21,7 @@ use std::{
     path::Path,
     sync::{
         Arc, Mutex,
-        atomic::{AtomicUsize, Ordering},
+        atomic::{AtomicU64, AtomicUsize, Ordering},
     },
 };
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
@@ -54,7 +53,13 @@ fn truncate_to_width(s: &str, max: usize) -> String {
 #[derive(Debug)]
 enum UiEvent {
     Message(String),
-    Progress { copied: f32, total: f32 },
+    Progress { done_bytes: u64, total_bytes: u64 },
+}
+
+#[derive(Debug, Clone)]
+struct CopyOp {
+    src_path: std::path::PathBuf,
+    dest_path: std::path::PathBuf,
 }
 
 /// Localizable messages loaded from `assets/translations.json`.
@@ -173,10 +178,10 @@ pub fn is_newer(src: &Path, dest: &Path) -> io::Result<bool> {
 ///
 /// // Prepare placeholders (in real code load translations and build a LogContext)
 /// let msg: Messages = serde_json::from_str("{}") /* load proper messages */ .unwrap_or_else(|_| panic!());
-/// let ctx = LogContext { logger: None, quiet: false, with_timestamp: false, timestamp_format: None, row: None, on_log: true, exclude_matcher: None, exclude_match_absolute: false, dry_run: true, exclude_patterns: None };
+/// let ctx = LogContext { logger: None, quiet: false, with_timestamp: false, timestamp_format: None, row: None, on_log: true, exclude_matcher: None, exclude_match_absolute: false, dry_run: true, exclude_patterns: None, show_skipped: rbackup::output::ShowSkipped::Summary };
 ///
 /// // Run a dry-run copy (will not actually copy files because dry_run = true)
-/// let (copied, skipped) = copy_incremental(Path::new("/tmp/src"), Path::new("/tmp/dest"), &msg, &ctx).unwrap();
+/// let (copied, skipped) = copy_incremental(Path::new("/tmp/src"), Path::new("/tmp/dest"), &msg, &ctx, false).unwrap();
 /// println!("copied={}, skipped={}", copied, skipped);
 /// ```
 pub fn copy_incremental(
@@ -184,25 +189,83 @@ pub fn copy_incremental(
     dest_dir: &Path,
     msg: &Messages,
     options: &LogContext,
+    delta: bool,
 ) -> io::Result<(usize, usize)> {
     // Collect all file entries in a single pass to avoid walking the tree twice.
-    // This trades memory for reduced filesystem traversal overhead which is
-    // beneficial for very large hierarchies where walking twice is expensive.
     let mut entries: Vec<_> = WalkDir::new(src_dir)
         .into_iter()
         .filter_map(Result::ok)
         .filter(|e| e.path().is_file())
         .collect();
 
-    let total_files = entries.len();
+    // Sort entries deterministically to improve cache behaviour and make output stable.
+    entries.sort_by_key(|e| e.path().to_owned());
 
-    // Prepare UI channel and spawn a dedicated UI thread that owns all
-    // terminal writes. This prevents concurrent calls to crossterm from
-    // multiple worker threads which produced garbled output.
+    // --- Phase 1: build operations list (and optionally a delta-only plan) -----
+    let mut skipped_excluded: usize = 0;
+
+    // In delta mode, `ops` contains only the files that will actually be copied.
+    // In normal mode, `ops` contains all candidate files (so we can log skipped).
+    let mut ops: Vec<CopyOp> = Vec::new();
+    let mut total_bytes: u64 = 0;
+
+    for entry in &entries {
+        let src_path = entry.path();
+        let rel_path = match src_path.strip_prefix(src_dir) {
+            Ok(p) => p,
+            Err(_) => continue,
+        };
+
+        // Exclude matcher applies to rel path (default) or absolute.
+        if let Some(ex) = &options.exclude_matcher {
+            let target_path = if options.exclude_match_absolute {
+                src_path
+            } else {
+                rel_path
+            };
+            let matched_pattern = ex.is_match(target_path).or_else(|| {
+                rel_path
+                    .file_name()
+                    .and_then(|name| ex.is_match(Path::new(name)))
+            });
+            if matched_pattern.is_some() {
+                skipped_excluded += 1;
+                continue;
+            }
+        }
+
+        let dest_path = dest_dir.join(rel_path);
+
+        if delta {
+            // Keep only the delta (newer or missing at destination).
+            match is_newer(src_path, &dest_path) {
+                Ok(true) => {
+                    let sz = entry.metadata().map(|m| m.len()).unwrap_or(0);
+                    total_bytes = total_bytes.saturating_add(sz);
+                    ops.push(CopyOp {
+                        src_path: src_path.to_owned(),
+                        dest_path,
+                    });
+                }
+                Ok(false) | Err(_) => {
+                    // unchanged (or unknown) in delta mode -> ignore here; counted later as skipped
+                }
+            }
+        } else {
+            // Normal mode: consider everything (we will decide copy/skip during execution).
+            let sz = entry.metadata().map(|m| m.len()).unwrap_or(0);
+            total_bytes = total_bytes.saturating_add(sz);
+            ops.push(CopyOp {
+                src_path: src_path.to_owned(),
+                dest_path,
+            });
+        }
+    }
+
+    // Prepare UI channel and spawn a dedicated UI thread that owns all terminal writes.
     let (ui_tx, ui_handle) = {
         let (tx, rx) = mpsc::channel::<UiEvent>();
-        // Clone all strings we need from `msg` into an owned `Messages`
-        // instance that can be used inside the UI thread.
+
         let ui_msg = Messages {
             cur_conf: msg.cur_conf.clone(),
             conf_file_not_found: msg.conf_file_not_found.clone(),
@@ -229,18 +292,12 @@ pub fn copy_incremental(
             use crossterm::style::Print;
             use crossterm::terminal;
             use crossterm::terminal::ClearType;
+            use std::collections::VecDeque;
             use std::io::stdout;
 
             let mut buffer: VecDeque<String> = VecDeque::new();
 
-            // Helper to redraw the scrollable area above the progress bar.
-            // This truncates messages to the terminal width to avoid wrapping
-            // onto the progress bar row and pads with spaces to clear leftover
-            // characters from previous longer lines.
             let redraw = |buf: &VecDeque<String>, cols: u16, scroll_rows: usize| {
-                // Use cols-1 as maximum printable content width to avoid terminals
-                // that wrap when writing exactly the last column. Clear each line
-                // first and then print at most `max_content` display columns.
                 if cols == 0 {
                     return;
                 }
@@ -248,8 +305,6 @@ pub fn copy_incremental(
 
                 for i in 0..scroll_rows {
                     if i < buf.len() {
-                        // Truncate by display width, then pad with spaces to clear
-                        // leftover characters from previous content.
                         let mut s = truncate_to_width(&buf[i], max_content);
                         let disp = UnicodeWidthStr::width(s.as_str());
                         if disp < max_content {
@@ -262,7 +317,6 @@ pub fn copy_incremental(
                             Print(s)
                         );
                     } else {
-                        // clear the line if there's no content for that row
                         let _ =
                             execute!(stdout(), MoveTo(0, i as u16), Clear(ClearType::CurrentLine));
                     }
@@ -273,12 +327,10 @@ pub fn copy_incremental(
             let _ = execute!(stdout(), Clear(ClearType::All));
 
             for ev in rx {
-                // recompute terminal size on each event to handle resizes
                 let (cols, rows) = terminal::size().unwrap_or((80, 24));
                 let progress_row = rows.saturating_sub(1);
-                let scroll_rows = progress_row as usize; // number of rows for scrolling area
+                let scroll_rows = progress_row as usize;
 
-                // adjust buffer size if terminal height changed
                 while buffer.len() > scroll_rows {
                     buffer.pop_front();
                 }
@@ -286,7 +338,6 @@ pub fn copy_incremental(
                 match ev {
                     UiEvent::Message(s) => {
                         if scroll_rows == 0 {
-                            // no space to render messages; just ignore
                             continue;
                         }
                         buffer.push_back(s);
@@ -295,34 +346,32 @@ pub fn copy_incremental(
                         }
                         redraw(&buffer, cols, scroll_rows);
                     }
-                    UiEvent::Progress { copied, total } => {
-                        // draw progress bar on the current bottom row
-                        crate::ui::draw_ui(copied, progress_row, total, &ui_msg);
+                    UiEvent::Progress {
+                        done_bytes,
+                        total_bytes,
+                    } => {
+                        crate::ui::draw_ui(done_bytes, progress_row, total_bytes, &ui_msg);
                     }
                 }
             }
         });
 
-        (tx, handle)
+        (Some(tx), handle)
     };
 
     // Prepare channel and logger thread if a file logger is configured.
     let (log_tx, log_handle) = if let Some(logger) = &options.logger {
         let (tx, rx) = mpsc::channel::<String>();
         let logger = logger.clone();
-        // Spawn a dedicated thread that serializes writes to the log file.
         let handle = thread::spawn(move || {
             for line in rx {
                 match logger.lock() {
                     Ok(mut guard) => {
                         let _ = writeln!(guard, "{}", line);
-                        let _ = guard.flush();
                     }
                     Err(poisoned) => {
-                        if let Ok(mut guard) = std::panic::catch_unwind(|| poisoned.into_inner()) {
-                            let _ = writeln!(guard, "{}", line);
-                            let _ = guard.flush();
-                        }
+                        let mut guard = poisoned.into_inner();
+                        let _ = writeln!(guard, "{}", line);
                     }
                 }
             }
@@ -333,179 +382,141 @@ pub fn copy_incremental(
     };
 
     let copied = AtomicUsize::new(0);
-    let skipped = AtomicUsize::new(0);
+    let skipped_unchanged = AtomicUsize::new(0);
+    let skipped_errors = AtomicUsize::new(0);
 
-    // Sort entries deterministically to improve cache behaviour and make output stable.
-    entries.sort_by_key(|e| e.path().to_owned());
+    let done_ops = AtomicUsize::new(0);
+    let done_bytes = AtomicU64::new(0);
 
-    // Use parallel iterator over entries to perform copies concurrently.
-    // keep the UI sender as an `Option<mpsc::Sender<UiEvent>>` so worker
-    // threads can check its presence before sending.
-    let ui_tx: Option<mpsc::Sender<UiEvent>> = Some(ui_tx);
-    entries.into_par_iter().for_each(|entry| {
-        let src_path = entry.path().to_owned();
-        let rel_path = match src_path.strip_prefix(src_dir) {
-            Ok(p) => p.to_owned(),
-            Err(_) => return,
-        };
+    let total_bytes_for_ui = if total_bytes == 0 { 1 } else { total_bytes };
 
-        // Apply 'exclude matcher' on path relative to src_dir (or absolute if requested)
-        if let Some(ex) = &options.exclude_matcher {
-            let target_path = if options.exclude_match_absolute {
-                src_path.as_path()
+    ops.par_iter().for_each(|op| {
+        let src_path = op.src_path.as_path();
+        let file_size = fs::metadata(src_path).map(|m| m.len()).unwrap_or(0);
+
+        let status_is_copied = if delta {
+            // Delta mode: every op is supposed to be copied.
+            if !options.dry_run {
+                if let Some(parent) = op.dest_path.parent() {
+                    let _ = fs::create_dir_all(parent);
+                }
+                fs::copy(src_path, op.dest_path.as_path()).is_ok()
             } else {
-                rel_path.as_path()
-            };
-            let matched_pattern = ex.is_match(target_path).or_else(|| {
-                rel_path
-                    .file_name()
-                    .and_then(|name| ex.is_match(Path::new(name)))
-            });
-
-            if let Some(pat) = matched_pattern {
-                skipped.fetch_add(1, Ordering::Relaxed);
-
-                // Build log line; send to file logger via channel if configured
-                let count =
-                    (copied.load(Ordering::Relaxed) + skipped.load(Ordering::Relaxed)) as f32;
-                let log_line = format!(
-                    "#{} {} {} - {} (pattern: {}).",
-                    count,
-                    msg.copying_file,
-                    src_path.display(),
-                    &msg.skipped_file,
-                    pat
-                );
-
-                if let Some(tx) = &log_tx {
-                    // Prepend timestamp if requested
-                    let full = if options.with_timestamp && !log_line.trim().is_empty() {
-                        let fmt = options
-                            .timestamp_format
-                            .as_deref()
-                            .unwrap_or("%Y-%m-%d %H:%M:%S");
-                        format!("[{}] {}", crate::output::now(fmt), log_line)
-                    } else {
-                        log_line.clone()
-                    };
-                    let _ = tx.send(full);
-                }
-
-                // Send message to UI thread for terminal rendering (scroll area)
-                if let Some(tx) = &ui_tx {
-                    let _ = tx.send(UiEvent::Message(log_line.clone()));
-                }
-
-                // Update UI occasionally to reduce contention on terminal
-                let total_f = if total_files == 0 {
-                    1.0
-                } else {
-                    total_files as f32
-                };
-                let progress =
-                    (copied.load(Ordering::Relaxed) + skipped.load(Ordering::Relaxed)) as f32;
-                if ((progress as usize).is_multiple_of(16) || (progress as usize) == total_files)
-                    && let Some(tx) = &ui_tx
-                {
-                    let _ = tx.send(UiEvent::Progress {
-                        copied: progress,
-                        total: total_f,
-                    });
-                }
-
-                return;
+                true
             }
-        }
-
-        let dest_path = dest_dir.join(&rel_path);
-
-        if let Some(parent) = dest_path.parent() {
-            let _ = fs::create_dir_all(parent);
-        }
-
-        let status = match is_newer(src_path.as_path(), &dest_path) {
-            Ok(true) => {
-                if options.dry_run {
-                    copied.fetch_add(1, Ordering::Relaxed);
-                    &msg.copied_file
-                } else {
-                    match fs::copy(src_path.as_path(), &dest_path) {
-                        Ok(_) => {
-                            copied.fetch_add(1, Ordering::Relaxed);
-                            &msg.copied_file
+        } else {
+            // Normal mode: decide at runtime whether this file is newer.
+            match is_newer(src_path, op.dest_path.as_path()) {
+                Ok(true) => {
+                    if !options.dry_run {
+                        if let Some(parent) = op.dest_path.parent() {
+                            let _ = fs::create_dir_all(parent);
                         }
-                        Err(_) => {
-                            skipped.fetch_add(1, Ordering::Relaxed);
-                            &msg.skipped_file
+                        fs::copy(src_path, op.dest_path.as_path()).is_ok()
+                    } else {
+                        true
+                    }
+                }
+                Ok(false) => {
+                    skipped_unchanged.fetch_add(1, Ordering::Relaxed);
+                    false
+                }
+                Err(_) => {
+                    // If we can't compare (e.g. dest missing/permission), treat as copy attempt.
+                    if !options.dry_run {
+                        if let Some(parent) = op.dest_path.parent() {
+                            let _ = fs::create_dir_all(parent);
                         }
+                        fs::copy(src_path, op.dest_path.as_path()).is_ok()
+                    } else {
+                        true
                     }
                 }
             }
-            Ok(false) | Err(_) => {
-                skipped.fetch_add(1, Ordering::Relaxed);
-                &msg.skipped_file
-            }
         };
 
-        // Build log line for both file logger and UI
-        let count = (copied.load(Ordering::Relaxed) + skipped.load(Ordering::Relaxed)) as f32;
-        let log_line = format!(
-            "#{} {} {} - {}.",
-            count,
-            msg.copying_file,
-            src_path.display(),
-            status
-        );
+        if status_is_copied {
+            copied.fetch_add(1, Ordering::Relaxed);
+        } else if delta {
+            // In delta mode, the only way to "not copied" is an error.
+            skipped_errors.fetch_add(1, Ordering::Relaxed);
+        }
 
-        // Send to file logger thread if present
-        if let Some(tx) = &log_tx {
-            let full = if options.with_timestamp && !log_line.trim().is_empty() {
-                let fmt = options
-                    .timestamp_format
-                    .as_deref()
-                    .unwrap_or("%Y-%m-%d %H:%M:%S");
-                format!("[{}] {}", crate::output::now(fmt), log_line)
+        let cur_ops = done_ops.fetch_add(1, Ordering::Relaxed) + 1;
+        let cur_bytes = done_bytes.fetch_add(file_size, Ordering::Relaxed) + file_size;
+
+        // Message line: always show copied; show skipped only when requested.
+        let should_print = status_is_copied || options.show_skipped == ShowSkipped::All;
+        if should_print {
+            let status = if status_is_copied {
+                &msg.copied_file
             } else {
-                log_line.clone()
+                &msg.skipped_file
             };
-            let _ = tx.send(full);
+
+            let log_line = format!(
+                "#{} {} {} - {}.",
+                cur_ops,
+                msg.copying_file,
+                op.src_path.display(),
+                status
+            );
+
+            if let Some(tx) = &log_tx {
+                let full = if options.with_timestamp {
+                    let fmt = options
+                        .timestamp_format
+                        .as_deref()
+                        .unwrap_or("%Y-%m-%d %H:%M:%S");
+                    format!("[{}] {}", crate::output::now(fmt), log_line)
+                } else {
+                    log_line.clone()
+                };
+                let _ = tx.send(full);
+            }
+
+            if let Some(tx) = &ui_tx {
+                let _ = tx.send(UiEvent::Message(log_line));
+            }
         }
 
-        // Send message to UI thread (terminal scroll area)
-        if let Some(tx) = &ui_tx {
-            let _ = tx.send(UiEvent::Message(log_line.clone()));
-        }
-
-        let total_f = if total_files == 0 {
-            1.0
-        } else {
-            total_files as f32
-        };
-        let progress = (copied.load(Ordering::Relaxed) + skipped.load(Ordering::Relaxed)) as f32;
-        if ((progress as usize).is_multiple_of(16) || (progress as usize) == total_files)
+        // Throttle UI progress updates.
+        if (cur_ops.is_multiple_of(16) || cur_ops == ops.len())
             && let Some(tx) = &ui_tx
         {
             let _ = tx.send(UiEvent::Progress {
-                copied: progress,
-                total: total_f,
+                done_bytes: cur_bytes,
+                total_bytes: total_bytes_for_ui,
             });
         }
     });
 
-    // Close the UI channel and join the UI thread
+    // Close channels and join helper threads.
     drop(ui_tx);
     let _ = ui_handle.join();
 
-    // Close the logger channel and join the logger thread if it was spawned
     drop(log_tx);
-    if let Some(handle) = log_handle {
-        let _ = handle.join();
+    if let Some(h) = log_handle {
+        let _ = h.join();
     }
 
-    Ok((
-        copied.load(Ordering::Relaxed),
-        skipped.load(Ordering::Relaxed),
-    ))
+    // Compute skipped totals.
+    let copied_n = copied.load(Ordering::Relaxed);
+    let skipped_unchanged_n = skipped_unchanged.load(Ordering::Relaxed);
+    let skipped_errors_n = skipped_errors.load(Ordering::Relaxed);
+
+    // In delta mode, unchanged files are those we ignored during planning.
+    let skipped_total = if delta {
+        // total files considered (entries) minus those excluded minus copied candidates (ops)
+        // This is only an approximation; we treat it as skipped for summary.
+        let considered = entries.len().saturating_sub(skipped_excluded);
+        let unchanged = considered.saturating_sub(ops.len());
+        unchanged + skipped_excluded + skipped_errors_n
+    } else {
+        skipped_excluded + skipped_unchanged_n + skipped_errors_n
+    };
+
+    Ok((copied_n, skipped_total))
 }
 
 /// Pattern matcher for exclude lists.

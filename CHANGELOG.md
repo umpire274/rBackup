@@ -4,6 +4,39 @@
 
 All notable changes to the `rbackup` project will be documented in this file.
 
+## [0.7.0] - 2026-02-23
+
+### ✨ Added
+
+- `-d, --delta` flag for delta-only copy mode.
+- Byte-based progress bar (replaces file-count progress).
+- Advanced `--show-skipped` option with explicit precedence over `--delta`.
+
+### 🔄 Changed
+
+- Default `copy` now shows both copied and skipped items.
+- In `--delta` mode, only copied items are shown by default.
+- Progress bar now reflects:
+    - Total bytes processed (full scan mode)
+    - Total bytes to copy (delta mode)
+- Logging behavior refactored with clear precedence rules:
+    - `--delta` sets implicit `show-skipped=never`
+    - `--show-skipped` explicitly overrides `--delta`
+
+### 🛠 Refactored
+
+- Two-phase copy architecture (plan → execute).
+- Logging context now implements `Default`.
+- `ShowSkipped` now derives `Default` with `#[default]` variant (clippy-clean).
+
+### 🧪 Fixed
+
+- Doctest updated for new `copy_incremental` signature.
+- Resolved `LogContext` missing field errors in tests.
+- Removed duplicate `delta` field in CLI definition.
+
+---
+
 ## [0.6.1] - 2025-10-27
 
 ### Added

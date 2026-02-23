@@ -8,7 +8,7 @@
 use crate::cli::Commands;
 use crate::config::Config;
 use crate::copy::{execute_copy, start_copy_message};
-use crate::output::{LogContext, log_output};
+use crate::output::{LogContext, ShowSkipped, log_output};
 use crate::utils::{Messages, build_exclude_matcher, create_logger};
 use rayon::ThreadPoolBuilder;
 use std::io;
@@ -52,6 +52,7 @@ pub fn handle_conf(
             exclude_match_absolute: false,
             dry_run: false,
             exclude_patterns: None,
+            show_skipped: ShowSkipped::Summary,
         };
 
         if *print_config {
@@ -155,6 +156,8 @@ pub fn handle_copy(
         ignore_case,
         dry_run,
         jobs,
+        delta,
+        show_skipped,
     } = cmd
     {
         // Determine effective number of worker threads:
@@ -173,6 +176,7 @@ pub fn handle_copy(
                 exclude_match_absolute: false,
                 dry_run: false,
                 exclude_patterns: None,
+                show_skipped: ShowSkipped::Summary,
             };
             log_output(
                 &format!("Invalid value for jobs: {} (must be > 0)", effective_jobs),
@@ -205,6 +209,7 @@ pub fn handle_copy(
                     exclude_match_absolute: false,
                     dry_run: false,
                     exclude_patterns: None,
+                    show_skipped: ShowSkipped::Summary,
                 };
                 log_output(
                     format!(
@@ -233,6 +238,7 @@ pub fn handle_copy(
                     exclude_match_absolute: false,
                     dry_run: false,
                     exclude_patterns: None,
+                    show_skipped: ShowSkipped::Summary,
                 };
                 log_output(&format!("Failed to create log file: {}", e), &ctx);
                 None
@@ -251,6 +257,15 @@ pub fn handle_copy(
             exclude_match_absolute: *absolute_exclude,
             dry_run: *dry_run,
             exclude_patterns: None,
+            show_skipped: match (*delta, show_skipped.as_ref()) {
+                (true, Some(v)) | (false, Some(v)) => match v {
+                    crate::cli::ShowSkippedArg::Never => ShowSkipped::Never,
+                    crate::cli::ShowSkippedArg::Summary => ShowSkipped::Summary,
+                    crate::cli::ShowSkippedArg::All => ShowSkipped::All,
+                },
+                (true, None) => ShowSkipped::Never,
+                (false, None) => ShowSkipped::All,
+            },
         };
 
         // Build exclude matcher here (avoid duplication)
@@ -275,7 +290,7 @@ pub fn handle_copy(
 
         start_copy_message(msg, &ctx, source, destination);
 
-        execute_copy(msg, &mut ctx, source, destination);
+        execute_copy(msg, &mut ctx, source, destination, *delta);
     }
     Ok(())
 }

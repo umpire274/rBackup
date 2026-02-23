@@ -67,7 +67,13 @@ fn flush_logger(ctx: &mut LogContext) {
 ///   updated during execution.
 /// - `source`: source directory path.
 /// - `destination`: destination directory path.
-pub fn execute_copy(msg: &Messages, ctx: &mut LogContext, source: &Path, destination: &Path) {
+pub fn execute_copy(
+    msg: &Messages,
+    ctx: &mut LogContext,
+    source: &Path,
+    destination: &Path,
+    delta: bool,
+) {
     let (_cols, rows) = terminal::size().unwrap_or((80, 24));
     let progress_row = rows.saturating_sub(1);
 
@@ -75,7 +81,7 @@ pub fn execute_copy(msg: &Messages, ctx: &mut LogContext, source: &Path, destina
 
     ctx.row = Some(progress_row);
 
-    match copy_incremental(source, destination, msg, ctx) {
+    match copy_incremental(source, destination, msg, ctx, delta) {
         Ok((copied, skipped)) => {
             ctx.row = None;
             ctx.on_log = true;

@@ -42,6 +42,39 @@ pub struct LogContext {
     /// Optional exclude matcher that supports identifying which pattern matched.
     /// See `utils::ExcludeMatcher` for details.
     pub exclude_matcher: Option<crate::utils::ExcludeMatcher>,
+
+    /// Control whether skipped items are printed to the scroll area.
+    ///
+    /// - Never: do not print skipped items.
+    /// - Summary: do not print skipped items during the run (only show the final summary).
+    /// - All: print both copied and skipped items.
+    pub show_skipped: ShowSkipped,
+}
+
+/// Policy for displaying skipped items.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum ShowSkipped {
+    Never,
+    Summary,
+    #[default]
+    All,
+}
+impl Default for LogContext {
+    fn default() -> Self {
+        Self {
+            logger: None,
+            quiet: false,
+            with_timestamp: false,
+            timestamp_format: None,
+            row: None,
+            on_log: true,
+            exclude_match_absolute: false,
+            dry_run: false,
+            exclude_patterns: None,
+            exclude_matcher: None,
+            show_skipped: ShowSkipped::default(),
+        }
+    }
 }
 
 const DEFAULT_TIMESTAMP_FORMAT: &str = "%Y-%m-%d %H:%M:%S";

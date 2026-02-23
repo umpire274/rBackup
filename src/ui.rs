@@ -10,6 +10,24 @@ use crossterm::{
     terminal::{Clear, ClearType},
 };
 use std::io::{Write, stdout};
+
+fn format_bytes(bytes: u64) -> String {
+    const UNITS: [&str; 5] = ["B", "KiB", "MiB", "GiB", "TiB"];
+    let mut size = bytes as f64;
+    let mut unit = 0usize;
+    while size >= 1024.0 && unit + 1 < UNITS.len() {
+        size /= 1024.0;
+        unit += 1;
+    }
+    if unit == 0 {
+        format!("{} {}", bytes, UNITS[unit])
+    } else if size >= 10.0 {
+        format!("{:.0} {}", size, UNITS[unit])
+    } else {
+        format!("{:.1} {}", size, UNITS[unit])
+    }
+}
+
 use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 /// Draw a simple progress bar and file counter on the given terminal row.
@@ -28,8 +46,12 @@ use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 /// // prepare `msg` by loading translations in real code
 /// // draw_ui(10.0, 20, 100.0, &msg);
 /// ```
-pub fn draw_ui(copied: f32, progress_row: u16, total: f32, msg: &Messages) {
-    let progress = if total == 0.0 { 0.0 } else { copied / total };
+pub fn draw_ui(done_bytes: u64, progress_row: u16, total_bytes: u64, msg: &Messages) {
+    let progress = if total_bytes == 0 {
+        0.0
+    } else {
+        done_bytes as f64 / total_bytes as f64
+    };
     let percent = (progress * 100.0).round();
 
     // Determine terminal width to avoid producing lines longer than the
@@ -46,7 +68,7 @@ pub fn draw_ui(copied: f32, progress_row: u16, total: f32, msg: &Messages) {
         10_usize
     };
 
-    let filled = (progress * bar_width as f32).round() as usize;
+    let filled = (progress * bar_width as f64).round() as usize;
     let empty = bar_width.saturating_sub(filled);
 
     let bar = format!(
@@ -54,9 +76,12 @@ pub fn draw_ui(copied: f32, progress_row: u16, total: f32, msg: &Messages) {
         "\u{2588}".repeat(filled),
         "\u{2591}".repeat(empty)
     );
+    let done_h = format_bytes(done_bytes);
+    let total_h = format_bytes(total_bytes);
+
     let mut progress_line = format!(
-        "{} file {}/{} ({:.0}%) {}",
-        msg.copy_progress, copied as usize, total as usize, percent, bar
+        "{} bytes {}/{} ({:.0}%) {}",
+        msg.copy_progress, done_h, total_h, percent, bar
     );
 
     // Truncate progress line by display width to avoid terminal wrapping
