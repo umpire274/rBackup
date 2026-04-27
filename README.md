@@ -7,6 +7,8 @@
 backups of directories. It is inspired by tools like `rsync` and `robocopy`, but designed with simplicity, portability,
 and localization in mind.
 
+> **Note:** rBackup does not require administrator privileges on any platform.
+
 [![Build Status](https://github.com/umpire274/rBackup/actions/workflows/ci.yml/badge.svg)](https://github.com/umpire274/rBackup/actions/workflows/ci.yml)
 [![Latest Release](https://img.shields.io/github/v/release/umpire274/rBackup)](https://github.com/umpire274/rBackup/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -83,16 +85,22 @@ rbackup copy ~/Documents /mnt/backup_drive/Documents
 
 ## 🧩 Options
 
-Global options (applicable to all commands)
+### Common Options (per-command)
 
-| Option                | Description                      |
-|-----------------------|----------------------------------|
-| `-q`, `--quiet`       | Suppress console output          |
-| `-t`, `--timestamp`   | Prepend timestamp to messages    |
-| `--log <FILE>`        | Write output to a log file       |
-| `-l`, `--lang <code>` | Force language (e.g. `en`, `it`) |
-| `-V`, `--version`     | Show version                     |
-| `-h`, `--help`        | Show help message                |
+These options are available on most commands:
+
+| Option              | Description                   |
+|---------------------|-------------------------------|
+| `-q`, `--quiet`     | Suppress console output       |
+| `-t`, `--timestamp` | Prepend timestamp to messages |
+| `--log <FILE>`      | Write output to a log file    |
+
+### Global Options
+
+| Option            | Description       |
+|-------------------|-------------------|
+| `-V`, `--version` | Show version      |
+| `-h`, `--help`    | Show help message |
 
 ---
 
@@ -115,6 +123,7 @@ rbackup copy <source> <destination> [OPTIONS]
 Important options:
 
 - `<source> <destination>` — required positional arguments
+- `-d`, `--delta` — copy only changed/new items (delta mode); skipped items are hidden by default
 - `-q`, `--quiet` — suppress console output
 - `-t`, `--timestamp` — prepend timestamps to messages
 - `--log <FILE>` — write output to a log file
@@ -122,7 +131,9 @@ Important options:
 - `--absolute-exclude` — match exclude patterns against absolute source paths
 - `--ignore-case` — perform case-insensitive matching for exclude patterns
 - `--dry-run` — perform a dry-run without copying files
-- `--show-skipped <never|summary|all>` — control whether skipped items are printed during the run (default: `summary`)
+- `-j, --jobs <N>` — number of worker threads to use (overrides automatic choice)
+- `--show-skipped <never|summary|all>` — control whether skipped items are printed during the run (default: `summary`;
+  overrides `--delta` default)
 
 Example:
 
@@ -147,7 +158,8 @@ Important options:
 - `--init` — initialize a default configuration file
 - `--print` — print the current configuration to stdout
 - `--edit` — open the configuration in the user's editor
-- `--editor <EDITOR>` — specify the editor to use (overrides $EDITOR/$VISUAL)
+- `--upgrade` — insert new config options into existing `rbackup.conf` when missing
+- `--editor <EDITOR>` — specify the editor to use (overrides `$EDITOR`/`$VISUAL`)
 
 Example:
 
@@ -166,6 +178,25 @@ rbackup help [COMMAND]
 ```
 
 Description: Print help for a specific command (e.g. `rbackup help copy`).
+
+---
+
+## 🌍 Language Support
+
+rBackup supports multiple languages with automatic system locale detection. The language is configured via the
+configuration file (`rbackup.conf`):
+
+- **auto** (default) — automatically detect system locale (falls back to English if not supported)
+- **en** — English
+- **it** — Italian
+
+To manage the configuration file:
+
+```bash
+rbackup config --init     # Create default config
+rbackup config --edit     # Edit config with default editor
+rbackup config --print    # View current config
+```
 
 ---
 
@@ -330,15 +361,38 @@ rbackup copy /home/alex/Projects /mnt/usb-backup --log backup.log --timestamp
 
 ## 🧪 Build from source
 
-To compile rbackup yourself:
+To compile rBackup yourself:
 
 ```sh
-git clone https://github.com/your-username/rbackup.git
+git clone https://github.com/umpire274/rbackup.git
 cd rbackup
 cargo build --release
 ```
 
-For Windows, rbackup.rc will be embedded automatically in the executable.
+The compiled binary will be available in `target/release/`.
+
+### Platform-specific requirements
+
+- **Windows**: The application icon (`assets/rbackup.ico`) is automatically embedded during the build via the `build.rs`
+  script.
+- **macOS/Linux**: No additional steps needed; build proceeds with standard Rust toolchain.
+
+### Development setup
+
+If you're contributing to the project, ensure you have the required Rust components:
+
+```sh
+rustup component add rustfmt
+rustup component add clippy
+```
+
+Run validation before submitting a PR:
+
+```sh
+cargo fmt --all -- --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo test --all
+```
 
 ---
 

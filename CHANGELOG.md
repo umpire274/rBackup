@@ -4,6 +4,31 @@
 
 All notable changes to the `rbackup` project will be documented in this file.
 
+## [0.7.1] - 2026-04-27
+
+### 🐛 Fixed
+
+- Fixed packaging error during `cargo package` / `cargo publish` caused by missing embedded asset:
+    - `assets/translations.json` is now correctly included in the crate
+    - Resolved runtime failure in `include_str!("../assets/translations.json")`
+
+### 📦 Packaging
+
+- Added `assets/**` to `package.include` in `Cargo.toml`
+- Ensured all required runtime assets are bundled in the published crate
+
+### 🔄 Dependencies
+
+- Updated several dependencies to newer compatible versions
+
+### 🧠 Notes
+
+- No functional changes to application behavior
+- No breaking changes
+- This is a maintenance release focused on packaging correctness and dependency updates
+
+---
+
 ## [0.7.0] - 2026-02-23
 
 ### ✨ Added
